@@ -22,6 +22,7 @@ from rest_framework.authtoken.views import obtain_auth_token
 
 # API URLs
 api_patterns = [
+    path('', include('apps.users.urls')),  # Auth endpoints
     path('auth/token/', obtain_auth_token, name='api_token_auth'),
     path('receipts/', include('apps.receipts.urls')),
     path('restaurants/', include('apps.restaurants.urls')),

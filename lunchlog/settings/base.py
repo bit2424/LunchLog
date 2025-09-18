@@ -35,9 +35,13 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
+    'apps.users',
     'apps.receipts',
     'apps.restaurants',
 ]
+
+# Custom user model
+AUTH_USER_MODEL = 'users.User'
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
