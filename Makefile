@@ -17,8 +17,14 @@ help: ## Show this help message
 up: ## Start all containers with specified profile (dev or prod)
 	docker compose --profile $(PROFILE) up -d
 	@echo "Containers started with profile: $(PROFILE)"
+	@if [ "$(PROFILE)" = "dev" ]; then\
+		@echo "Waiting for database to be ready..."\
+		@timeout 30 bash -c 'until docker compose exec -T db pg_isready -U lunchlog; do sleep 1; done' || echo "Database might not be ready yet"; fi
+	
+up-db-prod: ## Start only the database container
+	docker compose --profile $(PROFILE) up -d db
 	@echo "Waiting for database to be ready..."
-	@timeout 30 bash -c 'until docker compose exec -T db pg_isready -U lunchlog; do sleep 1; done' || echo "Database might not be ready yet"
+	@timeout 30 bash -c 'until docker compose exec -T db pg_isready -U lunchlog; do sleep 1; done' || echo "Database might not be ready yet";
 
 down: ## Stop and remove containers
 	docker compose --profile $(PROFILE) down
@@ -40,7 +46,10 @@ migrate: ## Run Django migrations
 	python manage.py migrate
 
 migrate-docker: ## Run Django migrations in Docker
-	docker exec backend python manage.py migrate
+	@if [ "$(PROFILE)" = "prod" ]; then\
+		docker exec backend_prod python manage.py migrate; fi
+	@if [ "$(PROFILE)" = "dev" ]; then\
+		docker exec backend python manage.py migrate; fi
 
 makemigrations: ## Create new Django migrations
 	python manage.py makemigrations
@@ -114,6 +123,10 @@ dev-setup: install up migrate  ## Complete development setup to run locally
 
 dev-setup-docker: down build up migrate-docker ## Complete development setup in Docker
 	@echo "Development environment setup complete!"
+	@echo "You can now access the API at http://localhost:9000/api/v1/"
+
+prod-setup: down build up-db-prod up migrate-docker ## Complete production setup in Docker
+	@echo "Production environment setup complete!"
 	@echo "You can now access the API at http://localhost:9000/api/v1/"
 
 # Utility commands
