@@ -13,6 +13,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . .
 
+# Create logs directory with proper permissions
+RUN mkdir -p /var/log/lunchlog && \
+    chown -R www-data:www-data /var/log/lunchlog && \
+    chmod 755 /var/log/lunchlog
+
 # Expose port
 EXPOSE 8000
 
