@@ -21,7 +21,17 @@ X_FRAME_OPTIONS = 'DENY'
 STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 # Production logging
-LOGGING['handlers']['file']['filename'] = '/var/log/lunchlog/django.log'
+# Add file handler
+LOGGING['handlers']['file'] = {
+    'level': 'INFO',
+    'class': 'logging.FileHandler',
+    'filename': '/var/log/lunchlog/django.log',
+    'formatter': 'verbose',
+}
+
+# Update loggers to use file handler
+LOGGING['loggers']['django']['handlers'].append('file')
+LOGGING['loggers']['apps']['handlers'].append('file')
 
 # Allowed hosts must be specified in production
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=lambda v: [s.strip() for s in v.split(',')])

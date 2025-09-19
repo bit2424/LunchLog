@@ -3,9 +3,12 @@ Base settings for lunchlog project.
 """
 
 import os
+import logging
+
 from pathlib import Path
 
 from decouple import config
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -85,15 +88,14 @@ DATABASES = {
         'NAME': config('DB_NAME', default='lunchlog'),
         'USER': config('DB_USER', default='lunchlog'),
         'PASSWORD': config('DB_PASSWORD', default='lunchlog123'),
-        'HOST': config('DB_HOST', default='localhost'),
+        'HOST': config('DB_HOST', default='db'),
         'PORT': config('DB_PORT', default='5432'),
     }
 }
 
-# Alternative: Use DATABASE_URL
-import dj_database_url
-if config('DATABASE_URL', default=None):
-    DATABASES['default'] = dj_database_url.parse(config('DATABASE_URL'))
+logger = logging.getLogger('django')
+logger.info(f"Database host: {DATABASES['default']['HOST']}")
+logger.info(f"Database port: {DATABASES['default']['PORT']}")
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
