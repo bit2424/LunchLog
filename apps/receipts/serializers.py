@@ -1,3 +1,4 @@
+from PIL import Image
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import Receipt
@@ -68,21 +69,32 @@ class ReceiptCreateSerializer(ReceiptSerializer):
         ]
         
     def validate_image(self, value):
-        """Validate the uploaded image file."""
+        """Validate the uploaded image file (size + type)."""
         if not value:
             raise serializers.ValidationError("Image file is required.")
-        
-        # Check file size (limit to 10MB)
-        if value.size > 10 * 1024 * 1024:
-            raise serializers.ValidationError("Image file too large. Size should not exceed 10MB.")
-        
-        # Check file type
-        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
-        if hasattr(value, 'content_type') and value.content_type not in allowed_types:
+
+        # Size check (1MB max)
+        max_size = 1 * 1024 * 1024
+        if int(value.size) > max_size:
             raise serializers.ValidationError(
-                "Unsupported file type. Please upload a JPEG, PNG, or GIF image."
+                f"Image file too large MB). "
+                "Maximum size allowed is 10 MB."
             )
-        
+
+        # File format check using Pillow
+        try:
+            img = Image.open(value)
+            img.verify()
+        except Exception:
+            raise serializers.ValidationError("Uploaded file is not a valid image.")
+
+        allowed_formats = ["JPEG", "PNG", "GIF"]
+        if img.format not in allowed_formats:
+            raise serializers.ValidationError(
+                f"Unsupported image format: {img.format}. "
+                f"Allowed formats are: {', '.join(allowed_formats)}."
+            )
+
         return value
 
 
