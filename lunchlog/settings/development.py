@@ -11,9 +11,9 @@ DEBUG = True
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # Development-specific apps (uncomment django_extensions after installing)
-# INSTALLED_APPS += [
-#     'django_extensions',
-# ]
+INSTALLED_APPS += [
+    'django_extensions',
+]
 
 # Allow all hosts in development
 ALLOWED_HOSTS = ['*']
