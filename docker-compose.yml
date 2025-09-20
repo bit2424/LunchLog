@@ -25,13 +25,29 @@ services:
   db:
     profiles: 
       - dev
-      - prod
     container_name: db
     image: postgres:15
     environment:
       POSTGRES_DB: lunchlog
       POSTGRES_USER: lunchlog
       POSTGRES_PASSWORD: lunchlog123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lunchlog"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    ports:
+      - "5432:5432"
+
+  db_prod:
+    profiles: 
+      - prod
+    container_name: db_prod
+    image: postgres:15
+    env_file:
+      - .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -53,16 +69,35 @@ services:
     volumes:
       - .:/app  # Only mount code for production
       - lunchlog_logs:/var/log/lunchlog  # Mount logs directory
-    ports:
-      - "9000:8000"
+
     depends_on:
-      - db
+      - db_prod
     env_file:
       - .env
     command: >
       bash -c "python manage.py migrate &&
                python manage.py create_default_user &&
                gunicorn --bind 0.0.0.0:8000 lunchlog.wsgi:application"
+
+  proxy:
+    profiles:
+      - prod
+    container_name: proxy
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/certs/fullchain.pem:/etc/nginx/certs/fullchain.pem:ro
+      - ./deploy/certs/privkey.pem:/etc/nginx/certs/privkey.pem:ro
+      - ./staticfiles:/app/staticfiles:ro
+      - ./media:/app/media:ro
+    depends_on:
+      - backend_prod
+    networks:
+      - default
 
 volumes:
   postgres_data:  # Database volume
