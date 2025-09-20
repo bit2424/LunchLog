@@ -2,6 +2,8 @@ from PIL import Image
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import Receipt
+from apps.restaurants.serializers import RestaurantSerializer
+from apps.restaurants.models import Restaurant
 
 User = get_user_model()
 
@@ -11,6 +13,13 @@ class ReceiptSerializer(serializers.ModelSerializer):
     
     image_url = serializers.SerializerMethodField(read_only=True)
     user = serializers.PrimaryKeyRelatedField(read_only=True)
+    restaurant = RestaurantSerializer(read_only=True)
+    restaurant_id = serializers.IntegerField(
+        source='restaurant.id',
+        write_only=True,
+        allow_null=True,
+        required=False
+    )
     
     class Meta:
         model = Receipt
@@ -19,6 +28,8 @@ class ReceiptSerializer(serializers.ModelSerializer):
             'user',
             'date',
             'price',
+            'restaurant',
+            'restaurant_id',
             'restaurant_name',
             'address',
             'image',
@@ -26,7 +37,14 @@ class ReceiptSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at'
         ]
-        read_only_fields = ['id', 'user', 'image_url', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'user', 'restaurant', 'image_url', 'created_at', 'updated_at']
+    
+    def validate_restaurant_id(self, value):
+        """Validate that the restaurant exists."""
+        if value is not None:
+            if not Restaurant.objects.filter(id=value).exists():
+                raise serializers.ValidationError("Restaurant with this ID does not exist.")
+        return value
     
     def get_image_url(self, obj):
         """Return the URL of the receipt image."""
@@ -37,6 +55,14 @@ class ReceiptSerializer(serializers.ModelSerializer):
         # Get the user from the request context
         user = self.context['request'].user
         validated_data['user'] = user
+        
+        # Handle restaurant_id field
+        restaurant_data = validated_data.pop('restaurant', {})
+        restaurant_id = restaurant_data.get('id')
+        if restaurant_id:
+            from apps.restaurants.models import Restaurant
+            validated_data['restaurant'] = Restaurant.objects.get(id=restaurant_id)
+        
         return super().create(validated_data)
     
     def to_representation(self, instance):
@@ -60,6 +86,7 @@ class ReceiptCreateSerializer(ReceiptSerializer):
             'id',
             'date',
             'price',
+            'restaurant_id',
             'restaurant_name',
             'address',
             'image',
@@ -106,8 +133,9 @@ class ReceiptListSerializer(ReceiptSerializer):
             'id',
             'date',
             'price',
-            'restaurant_name',
-            'address',
+            'restaurant',
+            'restaurant_name', 
+            'address',  
             'image_url',
             'created_at'
         ]

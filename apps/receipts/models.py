@@ -37,11 +37,24 @@ class Receipt(models.Model):
         validators=[MinValueValidator(Decimal('0.01'))],
         help_text="Total price of the purchase"
     )
+    restaurant = models.ForeignKey(
+        'restaurants.Restaurant',
+        on_delete=models.CASCADE,
+        related_name='receipts',
+        null=True,
+        blank=True,
+        help_text="Restaurant associated with this receipt"
+    )
+
     restaurant_name = models.CharField(
         max_length=255,
+        blank=True,
+        null=True,
         help_text="Name of the restaurant"
     )
     address = models.TextField(
+        blank=True,
+        null=True,
         help_text="Address of the restaurant"
     )
     image = models.ImageField(
@@ -59,7 +72,8 @@ class Receipt(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.restaurant_name} - {self.date} (${self.price})"
+        restaurant_name = self.restaurant.name if self.restaurant else self.restaurant_name
+        return f"{restaurant_name} - {self.date} (${self.price})"
 
     @property
     def image_url(self):
