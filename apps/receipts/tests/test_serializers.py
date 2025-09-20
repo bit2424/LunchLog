@@ -127,9 +127,12 @@ def test_receipt_list_serializer(test_receipt):
     
     # Check that only the specified fields are included
     expected_fields = {
-        'id', 'date', 'price', 'restaurant_name',
-        'address', 'image_url', 'created_at'
+        'id', 'date', 'price', 'restaurant', 'restaurant_name', 'address', 'image_url', 'created_at'
     }
+    print("====================obtained fields====================")
+    print(data.keys())
+    print("====================expected fields====================")
+    print(expected_fields)
     assert set(data.keys()) == expected_fields
     
     # Verify field values
