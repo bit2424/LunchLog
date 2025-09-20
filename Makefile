@@ -22,12 +22,15 @@ up: ## Start all containers with specified profile (dev or prod)
 		@timeout 30 bash -c 'until docker compose exec -T db pg_isready -U lunchlog; do sleep 1; done' || echo "Database might not be ready yet"; fi
 	
 up-db-prod: ## Start only the database container
-	docker compose --profile $(PROFILE) up -d db
+	docker compose --profile $(PROFILE) up -d db_prod
 	@echo "Waiting for database to be ready..."
-	@timeout 30 bash -c 'until docker compose exec -T db pg_isready -U lunchlog; do sleep 1; done' || echo "Database might not be ready yet";
+	@timeout 30 bash -c 'until docker compose exec -T db_prod pg_isready -U lunchlog; do sleep 1; done' || echo "Database might not be ready yet";
 
 down: ## Stop and remove containers
-	docker compose --profile $(PROFILE) down
+	if [ "$(PROFILE)" = "prod" ]; then\
+		docker compose --profile prod down; docker compose --profile dev down; fi
+	@if [ "$(PROFILE)" = "dev" ]; then\
+		docker compose --profile $(PROFILE) down; fi
 
 build: ## Build or rebuild containers
 	docker compose --profile $(PROFILE) build
@@ -127,7 +130,7 @@ dev-setup-docker: down build up migrate-docker ## Complete development setup in 
 
 prod-setup: down build up-db-prod up migrate-docker ## Complete production setup in Docker
 	@echo "Production environment setup complete!"
-	@echo "You can now access the API at http://localhost:9000/api/v1/"
+	@echo "You can now access the API at https://localhost/api/v1/"
 
 # Utility commands
 clean: ## Clean up temporary files
