@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# deployment files
+deploy/certs/*
+
 # C extensions
 *.so
 
