@@ -83,16 +83,29 @@ WSGI_APPLICATION = 'lunchlog.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='lunchlog'),
-        'USER': config('DB_USER', default='lunchlog'),
-        'PASSWORD': config('DB_PASSWORD', default='lunchlog123'),
-        'HOST': config('DB_HOST', default='db'),
-        'PORT': config('DB_PORT', default='5432'),
+
+if config('PROFILE', default='dev') == 'prod':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME', default='lunchlog'),
+            'USER': config('DB_USER', default='lunchlog'),
+            'PASSWORD': config('DB_PASSWORD', default='lunchlog123'),
+            'HOST': config('DB_HOST', default='db_prod'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME', default='lunchlog'),
+            'USER': config('DB_USER', default='lunchlog'),
+            'PASSWORD': config('DB_PASSWORD', default='lunchlog123'),
+            'HOST': config('DB_HOST', default='db'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
+    }
 
 logger = logging.getLogger('django')
 logger.info(f"Database host: {DATABASES['default']['HOST']}")
