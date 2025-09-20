@@ -30,7 +30,7 @@ def test_create_receipt_unauthenticated(api_client, test_receipt_data):
     """Test that unauthenticated users cannot create receipts."""
     url = RECEIPT_URL
     response = api_client.post(url, test_receipt_data, format='multipart')
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 def test_list_receipts(auth_client, test_user):
     """Test listing user's receipts."""

@@ -4,8 +4,8 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
-SIGNUP_URL = reverse('api:signup')
-LOGIN_URL = reverse('api:login')
+SIGNUP_URL = reverse('users:signup')
+LOGIN_URL = reverse('users:login')
 
 
 class PublicUserApiTests(TestCase):
