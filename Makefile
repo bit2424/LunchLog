@@ -27,10 +27,7 @@ up-db-prod: ## Start only the database container
 	@timeout 30 bash -c 'until docker compose exec -T db_prod pg_isready -U lunchlog; do sleep 1; done' || echo "Database might not be ready yet";
 
 down: ## Stop and remove containers
-	if [ "$(PROFILE)" = "prod" ]; then\
-		docker compose --profile prod down; docker compose --profile dev down; fi
-	@if [ "$(PROFILE)" = "dev" ]; then\
-		docker compose --profile $(PROFILE) down; fi
+	docker compose --profile prod down; docker compose --profile dev down;
 
 build: ## Build or rebuild containers
 	docker compose --profile $(PROFILE) build
@@ -87,10 +84,10 @@ runserver: ## Run Django development server
 
 # Testing
 test: ## Run all tests
-	python -m pytest
+	docker exec backend pytest -v
 
 test-coverage: ## Run tests with coverage report
-	python -m pytest --cov=. --cov-report=html --cov-report=term-missing
+	docker compose exec backend pytest --cov=. --cov-report=html --cov-report=term-missing
 
 # Code quality
 lint: ## Run linting (flake8)
