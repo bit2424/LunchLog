@@ -3,6 +3,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import Receipt
 from apps.restaurants.serializers import RestaurantSerializer
+from apps.restaurants.tasks import update_restaurant_info
 from apps.restaurants.models import Restaurant
 
 User = get_user_model()
@@ -14,7 +15,7 @@ class ReceiptSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField(read_only=True)
     user = serializers.PrimaryKeyRelatedField(read_only=True)
     restaurant = RestaurantSerializer(read_only=True)
-    restaurant_id = serializers.IntegerField(
+    restaurant_id = serializers.UUIDField(
         source='restaurant.id',
         write_only=True,
         allow_null=True,
@@ -59,11 +60,48 @@ class ReceiptSerializer(serializers.ModelSerializer):
         # Handle restaurant_id field
         restaurant_data = validated_data.pop('restaurant', {})
         restaurant_id = restaurant_data.get('id')
-        if restaurant_id:
-            from apps.restaurants.models import Restaurant
-            validated_data['restaurant'] = Restaurant.objects.get(id=restaurant_id)
+        restaurant_instance = None
         
-        return super().create(validated_data)
+        if restaurant_id:
+            restaurant_instance = Restaurant.objects.get(id=restaurant_id)
+            validated_data['restaurant'] = restaurant_instance
+        elif validated_data.get('restaurant_name') and validated_data.get('address'):
+            # If no restaurant_id but we have restaurant_name and address,
+            # try to find existing restaurant or create a stub
+            restaurant_name = validated_data.get('restaurant_name')
+            restaurant_address = validated_data.get('address')
+            
+            # Try to find existing restaurant by name and address
+            restaurant_instance = Restaurant.objects.filter(
+                name__iexact=restaurant_name,
+                address__icontains=restaurant_address[:50]  # Partial match
+            ).first()
+            
+            if not restaurant_instance:
+                # Create a stub restaurant record
+                # Generate a placeholder place_id (will be updated by Google Places if found)
+                import uuid
+                placeholder_place_id = f"stub_{uuid.uuid4().hex[:16]}"
+                
+                restaurant_instance = Restaurant.objects.create(
+                    place_id=placeholder_place_id,
+                    name=restaurant_name,
+                    address=restaurant_address
+                )
+                
+                # Queue a task to try to find the real place_id and update info                
+                update_restaurant_info.delay(str(restaurant_instance.id))
+            
+            validated_data['restaurant'] = restaurant_instance
+        
+        # Create the receipt
+        receipt = super().create(validated_data)
+        
+        # Trigger restaurant info update if restaurant exists
+        if restaurant_instance:
+            update_restaurant_info.delay(str(restaurant_instance.id))
+        
+        return receipt
     
     def to_representation(self, instance):
         """Return canonicalized payload with image_url."""
