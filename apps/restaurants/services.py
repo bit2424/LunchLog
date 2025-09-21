@@ -59,7 +59,7 @@ class GooglePlacesService:
                 'geometry',
                 'rating',
                 'business_status',
-                'type'
+                'types'
             ]
             
             result = self.client.place(
@@ -71,10 +71,10 @@ class GooglePlacesService:
                 logger.error(f"Google Places API error: {result.get('status')}")
                 return None
             
-            print("--------------------------------")
-            print("RAW Result from Google Places API:")
-            print(result)
-            print("--------------------------------")
+            logger.info("--------------------------------")
+            logger.info("RAW Result from Google Places API:")
+            logger.info(result)
+            logger.info("--------------------------------")
             
             place_data = result.get('result', {})
             
@@ -225,7 +225,7 @@ class GooglePlacesService:
         
         # Look for specific food-related types first (excluding generic ones)
         for type_name in types:
-            if type_name in food_related_types and type_name not in generic_types:
+            if type_name in food_related_types:
                 # Convert type name to readable cuisine name
                 cuisine_name = type_name.replace('_', ' ').title()
                 if cuisine_name not in cuisines:
@@ -267,3 +267,141 @@ class GooglePlacesService:
         except Exception as e:
             logger.error(f"Error searching places: {str(e)}")
             return []
+
+    def search_nearby_restaurants(self, latitude: float, longitude: float, 
+                                radius: int = 2000, min_rating: float = None, 
+                                max_price_level: int = None, cuisine_types: list = None,
+                                top_k_results: int = 20) -> list:
+        """
+        Search for restaurants near a given location with optional filters.
+        
+        Args:
+            latitude: Latitude coordinate
+            longitude: Longitude coordinate
+            radius: Search radius in meters (default 2km)
+            min_rating: Minimum rating filter (e.g., 4.0 for good restaurants)
+            max_price_level: Maximum price level (0=free, 1=inexpensive, 2=moderate, 3=expensive, 4=very expensive)
+            cuisine_types: List of cuisine types to filter by
+            top_k_results: Number of top results to return (default 20)
+        Returns:
+            List of restaurant results with details
+        """
+        if not self.client:
+            logger.error("Google Places client not initialized")
+            return []
+        
+        try:
+            # Search for restaurants near the location
+            results = self.client.places_nearby(
+                location=(latitude, longitude),
+                radius=radius,
+                type='restaurant'
+            )
+            
+            restaurants = []
+            
+            for place in results.get('results', []):
+                # Apply rating filter
+                if min_rating and place.get('rating', 0) < min_rating:
+                    continue
+                
+                # Apply price level filter
+                if max_price_level is not None and place.get('price_level', 5) > max_price_level:
+                    continue
+                
+                # Apply cuisine type filter
+                if cuisine_types:
+                    place_types = place.get('types', [])
+                    place_cuisines = self._extract_cuisines_from_types(place_types)
+                    
+                    # Check if any of the place's cuisines match our desired cuisines
+                    cuisine_match = False
+                    for place_cuisine in place_cuisines:
+                        for desired_cuisine in cuisine_types:
+                            if desired_cuisine.lower() in place_cuisine.lower():
+                                cuisine_match = True
+                                break
+                        if cuisine_match:
+                            break
+                    
+                    if not cuisine_match:
+                        continue
+                
+                # Extract restaurant details
+                restaurant_data = {
+                    'place_id': place.get('place_id'),
+                    'name': place.get('name'),
+                    'rating': place.get('rating'),
+                    'price_level': place.get('price_level'),
+                    'vicinity': place.get('vicinity'),
+                    'geometry': place.get('geometry'),
+                    'types': place.get('types', []),
+                    'cuisines': self._extract_cuisines_from_types(place.get('types', [])),
+                    'photos': place.get('photos', []),
+                    'business_status': place.get('business_status', 'OPERATIONAL')
+                }
+                
+                restaurants.append(restaurant_data)
+            
+            # Sort by rating descending by default
+            restaurants.sort(key=lambda x: x.get('rating', 0), reverse=True)
+            
+            return restaurants[:top_k_results]  # Return top k results
+            
+        except Exception as e:
+            logger.error(f"Error searching nearby restaurants: {str(e)}")
+            return []
+
+    def get_recommendations_near_location(self, latitude: float, longitude: float, 
+                                        recommendation_type: str, user_cuisines: list = None,
+                                        radius: int = 2000, top_k_results: int = 20) -> list:
+        """
+        Get restaurant recommendations near a specific location.
+        
+        Args:
+            latitude: Latitude coordinate
+            longitude: Longitude coordinate
+            recommendation_type: Type of recommendation ('good', 'cheap', 'cuisine_match')
+            user_cuisines: List of user's preferred cuisines (for cuisine_match type)
+            
+        Returns:
+            List of recommended restaurants
+        """
+        if recommendation_type == 'good':
+            # Good restaurants: rating >= 4.0
+            return self.search_nearby_restaurants(
+                latitude=latitude,
+                longitude=longitude,
+                min_rating=4.0,
+                radius=radius,
+                top_k_results=top_k_results
+            )
+        
+        elif recommendation_type == 'cheap':
+            # Cheap restaurants: price level <= 1 (free or inexpensive)
+            return self.search_nearby_restaurants(
+                latitude=latitude,
+                longitude=longitude,
+                max_price_level=1,
+                radius=radius,
+                top_k_results=top_k_results
+            )
+        
+        elif recommendation_type == 'cuisine_match' and user_cuisines:
+            # Restaurants matching user's preferred cuisines
+            return self.search_nearby_restaurants(
+                latitude=latitude,
+                longitude=longitude,
+                cuisine_types=user_cuisines,
+                radius=radius,
+                top_k_results=top_k_results
+            )
+        
+        else:
+            # Default: just return nearby restaurants
+            return self.search_nearby_restaurants(
+                latitude=latitude,
+                longitude=longitude,
+                radius=radius,
+                top_k_results=top_k_results
+            )
