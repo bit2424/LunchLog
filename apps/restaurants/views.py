@@ -26,7 +26,7 @@ class RestaurantViewSet(viewsets.ModelViewSet):
     ]
     
     # Fields that can be searched
-    search_fields = ['name', 'address', 'cuisine']
+    search_fields = ['name', 'address', 'cuisines__name']
     
     # Fields that can be used for ordering
     ordering_fields = ['name', 'rating', 'updated_at']
@@ -42,7 +42,7 @@ class RestaurantViewSet(viewsets.ModelViewSet):
         # Filter by cuisine
         cuisine = self.request.query_params.get('cuisine')
         if cuisine is not None:
-            queryset = queryset.filter(cuisine__icontains=cuisine)
+            queryset = queryset.filter(cuisines__name__icontains=cuisine)
         
         # Filter by name
         name = self.request.query_params.get('name')
