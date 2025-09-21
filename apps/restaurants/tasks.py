@@ -213,31 +213,3 @@ def create_restaurant_from_places_data(place_id: str, name: str, address: str) -
     except Exception as e:
         logger.error(f"Error creating restaurant with place_id {place_id}: {str(e)}")
         return None
-
-
-@shared_task
-def cleanup_stale_restaurant_updates():
-    """
-    Cleanup task to identify restaurants that haven't been updated in a while.
-    This can be used for monitoring and alerting.
-    """
-    from datetime import timedelta
-    
-    stale_threshold = timezone.now() - timedelta(days=7)
-    stale_restaurants = Restaurant.objects.filter(updated_at__lt=stale_threshold)
-    
-    stale_count = stale_restaurants.count()
-    logger.info(f"Found {stale_count} restaurants not updated in the last 7 days")
-    
-    # Optionally queue updates for stale restaurants
-    if stale_count > 0:
-        for restaurant in stale_restaurants[:100]:  # Limit to avoid overwhelming the system
-            update_restaurant_info.delay(str(restaurant.id))
-        
-        logger.info(f"Queued updates for {min(stale_count, 100)} stale restaurants")
-    
-    return {
-        'status': 'success',
-        'stale_count': stale_count,
-        'queued_updates': min(stale_count, 100)
-    }
