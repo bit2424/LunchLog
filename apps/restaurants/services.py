@@ -59,7 +59,7 @@ class GooglePlacesService:
                 'geometry',
                 'rating',
                 'business_status',
-                'types'
+                'type'
             ]
             
             result = self.client.place(
