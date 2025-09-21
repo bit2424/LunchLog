@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework import status
 from decimal import Decimal
-from apps.restaurants.models import Restaurant
+from apps.restaurants.models import Cuisine, Restaurant
 from apps.receipts.models import Receipt
 
 
@@ -47,7 +47,6 @@ def mock_google_places_data():
             'latitude': Decimal('40.7128000'),
             'longitude': Decimal('-74.0060000'),
             'rating': Decimal('4.50'),
-            'cuisine': 'Italian',
         },
         'find_place': {
             'place_id': 'ChIJTest123456789',
@@ -67,7 +66,6 @@ def test_restaurant():
         address='456 Existing St, NY',
         latitude=Decimal('40.7580'),
         longitude=Decimal('-73.9855'),
-        cuisine='American',
         rating=Decimal('4.2')
     )
     return restaurant
@@ -76,28 +74,28 @@ def test_restaurant():
 @pytest.fixture
 def test_restaurants():
     """Create and return a set of test restaurants for search/filter tests."""
+    italian_cuisine = Cuisine.objects.create(name='Italian')
+    american_cuisine = Cuisine.objects.create(name='American')
+    japanese_cuisine = Cuisine.objects.create(name='Japanese')
     restaurants = [
         Restaurant.objects.create(
             place_id='pizza1',
             name='Mario\'s Pizza',
             address='123 Pizza St',
-            cuisine='Italian',
-            rating=Decimal('4.5')
-        ),
+            rating=Decimal('4.5'),
+        ).cuisines.set([italian_cuisine]),
         Restaurant.objects.create(
             place_id='burger1',
             name='Burger Palace',
             address='456 Burger Ave',
-            cuisine='American',
             rating=Decimal('4.0')
-        ),
+        ).cuisines.set([american_cuisine]),
         Restaurant.objects.create(
             place_id='sushi1',
             name='Sushi Express',
             address='789 Sushi Rd',
-            cuisine='Japanese',
             rating=Decimal('4.8')
-        )
+        ).cuisines.set([japanese_cuisine])
     ]
     return restaurants
 

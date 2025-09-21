@@ -65,9 +65,8 @@ def test_complete_user_flow_with_restaurant_creation(auth_client, test_receipt_d
     assert restaurant.place_id == 'ChIJTest123456789'
     assert restaurant.name == 'Test Pizza Place'
     assert restaurant.address == '123 Main St, New York, NY 10001, USA'
-    assert restaurant.latitude == Decimal('40.7128000')
-    assert restaurant.longitude == Decimal('-74.0060000')
-    assert restaurant.cuisine == 'Italian'
+    assert restaurant.latitude ==  40.7128000
+    assert restaurant.longitude == -74.0060000
     assert restaurant.rating == Decimal('4.50')
 
 
@@ -144,7 +143,8 @@ def test_user_can_search_restaurants(auth_client, test_restaurants):
     response = auth_client.get('/api/v1/restaurants/?cuisine=Japanese')
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data['results']) == 1
-    assert response.data['results'][0]['cuisine'] == 'Japanese'
+    print(response.data['results'][0]['cuisines'])
+    assert 'Japanese' in [cuisine['name'] for cuisine in response.data['results'][0]['cuisines']]
     
     # Test filter by rating range
     response = auth_client.get('/api/v1/restaurants/?rating_min=4.5')
@@ -162,7 +162,6 @@ def test_celery_task_updates_stub_restaurant(db, mock_google_places_data):
         address='Partial Address',
         latitude=None,
         longitude=None,
-        cuisine=None,
         rating=None
     )
     
@@ -180,9 +179,8 @@ def test_celery_task_updates_stub_restaurant(db, mock_google_places_data):
     assert stub_restaurant.place_id == 'ChIJTest123456789'
     assert stub_restaurant.name == 'Test Pizza Place'
     assert stub_restaurant.address == '123 Main St, New York, NY 10001, USA'
-    assert stub_restaurant.latitude == Decimal('40.7128000')
-    assert stub_restaurant.longitude == Decimal('-74.0060000')
-    assert stub_restaurant.cuisine == 'Italian'
+    assert stub_restaurant.latitude == 40.7128000
+    assert stub_restaurant.longitude == -74.0060000
     assert stub_restaurant.rating == Decimal('4.50')
 
 
@@ -249,7 +247,6 @@ def test_celery_scheduled_job_execution(db, mock_google_places_data, celery_eage
         place_id='ChIJTest123456789',
         name='Test Restaurant',
         address='Original Address',
-        cuisine=None,
         rating=None
     )
     
@@ -277,7 +274,6 @@ def test_celery_scheduled_job_execution(db, mock_google_places_data, celery_eage
         # Verify the restaurant was actually updated
         restaurant.refresh_from_db()
         assert restaurant.name == 'Test Pizza Place'  # Should be updated from mock data
-        assert restaurant.cuisine == 'Italian'  # Should be updated from mock data
         assert restaurant.address == '123 Main St, New York, NY 10001, USA'
 
 
