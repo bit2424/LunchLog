@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from django.conf import settings
 from decimal import Decimal
 from django.core.validators import MinValueValidator, MaxValueValidator
 
@@ -81,3 +82,70 @@ class Restaurant(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class UserRestaurantVisit(models.Model):
+    """Model tracking how many times a user has visited each restaurant."""
+    
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE,
+        related_name='restaurant_visits'
+    )
+    restaurant = models.ForeignKey(
+        Restaurant, 
+        on_delete=models.CASCADE,
+        related_name='user_visits'
+    )
+    last_visit = models.DateField(
+        auto_now=True,
+        help_text="Date of the most recent visit"
+    )
+    visit_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Total number of visits to this restaurant"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user", "restaurant")
+        ordering = ['-last_visit', '-visit_count']
+        indexes = [
+            models.Index(fields=['user', '-visit_count'], name='user_rest_visit_count_idx'),
+            models.Index(fields=['user', '-last_visit'], name='user_rest_last_visit_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} -> {self.restaurant.name} ({self.visit_count} visits)"
+
+
+class UserCuisineStat(models.Model):
+    """Model tracking how many times a user has visited restaurants of each cuisine type."""
+    
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE,
+        related_name='cuisine_stats'
+    )
+    cuisine = models.ForeignKey(
+        Cuisine, 
+        on_delete=models.CASCADE,
+        related_name='user_stats'
+    )
+    visit_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Total number of visits to restaurants of this cuisine type"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user", "cuisine")
+        ordering = ['-visit_count']
+        indexes = [
+            models.Index(fields=['user', '-visit_count'], name='user_cuisine_count_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} -> {self.cuisine.name} ({self.visit_count} visits)"
