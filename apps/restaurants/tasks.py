@@ -4,7 +4,7 @@ from celery import shared_task
 from django.utils import timezone
 from django.db import transaction
 
-from .models import Restaurant
+from .models import Restaurant, Cuisine
 from .services import GooglePlacesService
 
 logger = logging.getLogger(__name__)
@@ -71,9 +71,21 @@ def update_restaurant_info(self, restaurant_id: str):
                 restaurant.address = data['address']
                 updated_fields.append('address')
             
-            if data.get('cuisine') and data['cuisine'] != restaurant.cuisine:
-                restaurant.cuisine = data['cuisine']
-                updated_fields.append('cuisine')
+            # Handle cuisines (many-to-many relationship)
+            if data.get('cuisines'):
+                current_cuisine_names = set(restaurant.cuisines.values_list('name', flat=True))
+                new_cuisine_names = set(data['cuisines'])
+                
+                if current_cuisine_names != new_cuisine_names:
+                    # Create cuisine objects if they don't exist
+                    cuisine_objects = []
+                    for cuisine_name in new_cuisine_names:
+                        cuisine, created = Cuisine.objects.get_or_create(name=cuisine_name)
+                        cuisine_objects.append(cuisine)
+                    
+                    # Update the many-to-many relationship
+                    restaurant.cuisines.set(cuisine_objects)
+                    updated_fields.append('cuisines')
             
             if data.get('rating') and data['rating'] != restaurant.rating:
                 restaurant.rating = data['rating']
@@ -192,9 +204,17 @@ def create_restaurant_from_places_data(place_id: str, name: str, address: str) -
                 address=data.get('address', address),
                 latitude=data.get('latitude'),
                 longitude=data.get('longitude'),
-                cuisine=data.get('cuisine'),
                 rating=data.get('rating')
             )
+            
+            # Handle cuisines (many-to-many relationship)
+            if data.get('cuisines'):
+                cuisine_objects = []
+                for cuisine_name in data['cuisines']:
+                    cuisine, created = Cuisine.objects.get_or_create(name=cuisine_name)
+                    cuisine_objects.append(cuisine)
+                restaurant.cuisines.set(cuisine_objects)
+            
             logger.info(f"Created restaurant {restaurant.name} with Google Places data")
         else:
             # Create basic restaurant record with provided data
