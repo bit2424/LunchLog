@@ -4,6 +4,22 @@ from decimal import Decimal
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 
+class Cuisine(models.Model):
+    """Model representing a cuisine type."""
+    
+    name = models.CharField(
+        max_length=100, 
+        unique=True,
+        help_text="Cuisine type name (e.g., Italian, Chinese, American)"
+    )
+    
+    class Meta:
+        ordering = ['name']
+    
+    def __str__(self):
+        return self.name
+
+
 class Restaurant(models.Model):
     """Model representing a restaurant with Google Places integration."""
     
@@ -24,26 +40,21 @@ class Restaurant(models.Model):
     address = models.TextField(
         help_text="Full formatted address"
     )
-    # Use DecimalField to match existing structure
-    latitude = models.DecimalField(
-        max_digits=10,
-        decimal_places=7,
+    latitude = models.FloatField(
         blank=True,
         null=True,
         help_text="Latitude coordinate"
     )
-    longitude = models.DecimalField(
-        max_digits=10,
-        decimal_places=7,
+    longitude = models.FloatField(
         blank=True,
         null=True,
         help_text="Longitude coordinate"
     )
-    cuisine = models.CharField(
-        max_length=100, 
-        blank=True, 
-        null=True,
-        help_text="Primary cuisine type"
+    cuisines = models.ManyToManyField(
+        Cuisine, 
+        related_name="restaurants",
+        blank=True,
+        help_text="Cuisine types associated with this restaurant"
     )
     rating = models.DecimalField(
         max_digits=3,
@@ -66,7 +77,6 @@ class Restaurant(models.Model):
         indexes = [
             models.Index(fields=['place_id'], name='restaurant_place_id_idx'),
             models.Index(fields=['name'], name='restaurant_name_idx'),
-            models.Index(fields=['cuisine'], name='restaurant_cuisine_idx'),
         ]
 
     def __str__(self):
