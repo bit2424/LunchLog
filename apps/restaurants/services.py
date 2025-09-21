@@ -82,21 +82,21 @@ class GooglePlacesService:
             geometry = place_data.get('geometry', {})
             location = geometry.get('location', {})
             
-            # Extract cuisine type from Google Place types
+            # Extract cuisine types from Google Place types
             place_types = place_data.get('types') or []
             # Some APIs expose singular 'type'
             if not place_types and place_data.get('type'):
                 place_types = [place_data.get('type')]
-            cuisine = self._extract_cuisine_from_types(place_types)
+            cuisines = self._extract_cuisines_from_types(place_types)
             
             return {
                 'place_id': place_data.get('place_id'),
                 'name': place_data.get('name'),
                 'address': place_data.get('formatted_address'),
-                'latitude': Decimal(str(location.get('lat', 0))) if location.get('lat') else None,
-                'longitude': Decimal(str(location.get('lng', 0))) if location.get('lng') else None,
+                'latitude': float(location.get('lat', 0)) if location.get('lat') else None,
+                'longitude': float(location.get('lng', 0)) if location.get('lng') else None,
                 'rating': Decimal(str(place_data.get('rating', 0))) if place_data.get('rating') else None,
-                'cuisine': cuisine,
+                'cuisines': cuisines,
                 'business_status': place_data.get('business_status', 'UNKNOWN')
             }
             
@@ -140,61 +140,105 @@ class GooglePlacesService:
             logger.error(f"Error finding place from text '{text_query}': {str(e)}")
             return None
     
-    def _extract_cuisine_from_types(self, types: list) -> Optional[str]:
+    def _extract_cuisines_from_types(self, types: list) -> list:
         """
-        Extract cuisine type from Google Places types.
+        Extract cuisine types from Google Places types.
         
         Args:
             types: List of Google Place types
             
         Returns:
-            Cuisine type string or None
+            List of cuisine type strings
         """
-        # Map Google Place types to cuisine types
-        cuisine_map = {
-            'bakery': 'Bakery',
-            'bar': 'Bar',
-            'cafe': 'Cafe',
-            'meal_delivery': 'Delivery',
-            'meal_takeaway': 'Takeaway',
-            'restaurant': 'Restaurant',
-            'food': 'Food',
-            # Specific cuisine types
-            'chinese_restaurant': 'Chinese',
-            'indian_restaurant': 'Indian',
-            'italian_restaurant': 'Italian',
-            'japanese_restaurant': 'Japanese',
-            'mexican_restaurant': 'Mexican',
-            'thai_restaurant': 'Thai',
-            'french_restaurant': 'French',
-            'korean_restaurant': 'Korean',
-            'vietnamese_restaurant': 'Vietnamese',
-            'greek_restaurant': 'Greek',
-            'spanish_restaurant': 'Spanish',
-            'turkish_restaurant': 'Turkish',
-            'american_restaurant': 'American',
-            'seafood_restaurant': 'Seafood',
-            'steak_house': 'Steakhouse',
-            'sushi_restaurant': 'Sushi',
-            'pizza_restaurant': 'Pizza',
-            'sandwich_shop': 'Sandwiches',
-            'hamburger_restaurant': 'Burgers',
-            'fast_food_restaurant': 'Fast Food',
+        # Official Google Places restaurant and food-related types
+        food_related_types = {
+            'acai_shop',
+            'afghani_restaurant',
+            'african_restaurant',
+            'american_restaurant',
+            'asian_restaurant',
+            'bagel_shop',
+            'bakery',
+            'bar',
+            'bar_and_grill',
+            'barbecue_restaurant',
+            'brazilian_restaurant',
+            'breakfast_restaurant',
+            'brunch_restaurant',
+            'buffet_restaurant',
+            'cafe',
+            'cafeteria',
+            'candy_store',
+            'cat_cafe',
+            'chinese_restaurant',
+            'chocolate_factory',
+            'chocolate_shop',
+            'coffee_shop',
+            'confectionery',
+            'deli',
+            'dessert_restaurant',
+            'dessert_shop',
+            'diner',
+            'dog_cafe',
+            'donut_shop',
+            'fast_food_restaurant',
+            'fine_dining_restaurant',
+            'food_court',
+            'french_restaurant',
+            'greek_restaurant',
+            'hamburger_restaurant',
+            'ice_cream_shop',
+            'indian_restaurant',
+            'indonesian_restaurant',
+            'italian_restaurant',
+            'japanese_restaurant',
+            'juice_shop',
+            'korean_restaurant',
+            'lebanese_restaurant',
+            'meal_delivery',
+            'meal_takeaway',
+            'mediterranean_restaurant',
+            'mexican_restaurant',
+            'middle_eastern_restaurant',
+            'pizza_restaurant',
+            'pub',
+            'ramen_restaurant',
+            'restaurant',
+            'sandwich_shop',
+            'seafood_restaurant',
+            'spanish_restaurant',
+            'steak_house',
+            'sushi_restaurant',
+            'tea_house',
+            'thai_restaurant',
+            'turkish_restaurant',
+            'vegan_restaurant',
+            'vegetarian_restaurant',
+            'vietnamese_restaurant',
+            'wine_bar'
         }
         
-        # Look for specific cuisine types first
-        for type_name in types:
-            if type_name in cuisine_map:
-                cuisine = cuisine_map[type_name]
-                if cuisine != 'Restaurant' and cuisine != 'Food':  # Skip generic types
-                    return cuisine
+        # Generic types to skip unless nothing else is found
+        generic_types = {'restaurant', 'meal_delivery', 'meal_takeaway', 'food'}
         
-        # Fall back to generic restaurant types
-        for type_name in types:
-            if type_name in ['restaurant', 'food', 'meal_delivery', 'meal_takeaway']:
-                return 'Restaurant'
+        cuisines = []
         
-        return None
+        # Look for specific food-related types first (excluding generic ones)
+        for type_name in types:
+            if type_name in food_related_types and type_name not in generic_types:
+                # Convert type name to readable cuisine name
+                cuisine_name = type_name.replace('_', ' ').title()
+                if cuisine_name not in cuisines:
+                    cuisines.append(cuisine_name)
+        
+        # If no specific cuisines found, fall back to generic restaurant type
+        if not cuisines:
+            for type_name in types:
+                if type_name in generic_types:
+                    cuisines.append('Restaurant')
+                    break
+        
+        return cuisines
 
     def search_places_by_text(self, query: str, location: str = None) -> list:
         """
