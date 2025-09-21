@@ -7,9 +7,35 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token
 
-from .models import Restaurant
+from .models import Restaurant, Cuisine
 
 User = get_user_model()
+
+
+class CuisineModelTest(TestCase):
+    """Test cases for Cuisine model."""
+    
+    def test_cuisine_creation(self):
+        """Test creating a cuisine."""
+        cuisine = Cuisine.objects.create(name='Italian')
+        self.assertEqual(cuisine.name, 'Italian')
+        self.assertEqual(str(cuisine), 'Italian')
+    
+    def test_cuisine_unique_name(self):
+        """Test that cuisine names are unique."""
+        Cuisine.objects.create(name='Italian')
+        with self.assertRaises(Exception):
+            Cuisine.objects.create(name='Italian')
+    
+    def test_cuisine_ordering(self):
+        """Test that cuisines are ordered by name."""
+        Cuisine.objects.create(name='Italian')
+        Cuisine.objects.create(name='American')
+        Cuisine.objects.create(name='Chinese')
+        
+        cuisines = list(Cuisine.objects.all())
+        names = [c.name for c in cuisines]
+        self.assertEqual(names, ['American', 'Chinese', 'Italian'])
 
 
 class RestaurantModelTest(TestCase):
@@ -20,20 +46,28 @@ class RestaurantModelTest(TestCase):
             'place_id': 'ChIJN1t_tDeuEmsRUsoyG83frY4',
             'name': 'Test Restaurant',
             'address': '123 Test Street, Test City',
-            'latitude': Decimal('40.7128'),
-            'longitude': Decimal('-74.0060'),
-            'cuisine': 'Italian',
+            'latitude': 40.7128,
+            'longitude': -74.0060,
             'rating': Decimal('4.5')
         }
+        self.italian_cuisine = Cuisine.objects.create(name='Italian')
+        self.pizza_cuisine = Cuisine.objects.create(name='Pizza')
     
     def test_restaurant_creation(self):
         """Test creating a restaurant."""
         restaurant = Restaurant.objects.create(**self.restaurant_data)
+        restaurant.cuisines.set([self.italian_cuisine, self.pizza_cuisine])
+        
         self.assertEqual(restaurant.name, 'Test Restaurant')
         self.assertEqual(restaurant.place_id, 'ChIJN1t_tDeuEmsRUsoyG83frY4')
-        self.assertEqual(restaurant.cuisine, 'Italian')
         self.assertEqual(restaurant.rating, Decimal('4.5'))
         self.assertTrue(isinstance(restaurant.id, uuid.UUID))
+        
+        # Test cuisines relationship
+        self.assertEqual(restaurant.cuisines.count(), 2)
+        cuisine_names = list(restaurant.cuisines.values_list('name', flat=True))
+        self.assertIn('Italian', cuisine_names)
+        self.assertIn('Pizza', cuisine_names)
     
     def test_restaurant_str(self):
         """Test restaurant string representation."""
@@ -64,11 +98,12 @@ class RestaurantAPITest(APITestCase):
             'place_id': 'ChIJN1t_tDeuEmsRUsoyG83frY4',
             'name': 'Test Restaurant',
             'address': '123 Test Street, Test City',
-            'latitude': '40.7128',
-            'longitude': '-74.0060',
-            'cuisine': 'Italian',
+            'latitude': 40.7128,
+            'longitude': -74.0060,
             'rating': '4.5'
         }
+        self.italian_cuisine = Cuisine.objects.create(name='Italian')
+        self.french_cuisine = Cuisine.objects.create(name='French')
     
     def test_create_restaurant(self):
         """Test creating a restaurant via API."""
@@ -85,11 +120,11 @@ class RestaurantAPITest(APITestCase):
             place_id='ChIJN1t_tDeuEmsRUsoyG83frY4',
             name='Test Restaurant',
             address='123 Test Street, Test City',
-            latitude=Decimal('40.7128'),
-            longitude=Decimal('-74.0060'),
-            cuisine='Italian',
+            latitude=40.7128,
+            longitude=-74.0060,
             rating=Decimal('4.5')
         )
+        restaurant.cuisines.set([self.italian_cuisine])
         
         url = '/api/v1/restaurants/'
         response = self.client.get(url)
@@ -103,11 +138,11 @@ class RestaurantAPITest(APITestCase):
             place_id='ChIJN1t_tDeuEmsRUsoyG83frY4',
             name='Test Restaurant',
             address='123 Test Street, Test City',
-            latitude=Decimal('40.7128'),
-            longitude=Decimal('-74.0060'),
-            cuisine='Italian',
+            latitude=40.7128,
+            longitude=-74.0060,
             rating=Decimal('4.5')
         )
+        restaurant.cuisines.set([self.italian_cuisine])
         
         url = f'/api/v1/restaurants/{restaurant.id}/'
         response = self.client.get(url)
@@ -120,22 +155,20 @@ class RestaurantAPITest(APITestCase):
             place_id='ChIJN1t_tDeuEmsRUsoyG83frY4',
             name='Test Restaurant',
             address='123 Test Street, Test City',
-            latitude=Decimal('40.7128'),
-            longitude=Decimal('-74.0060'),
-            cuisine='Italian',
+            latitude=40.7128,
+            longitude=-74.0060,
             rating=Decimal('4.5')
         )
+        restaurant.cuisines.set([self.italian_cuisine])
         
         updated_data = self.restaurant_data.copy()
         updated_data['name'] = 'Updated Restaurant'
-        updated_data['cuisine'] = 'French'
         
         url = f'/api/v1/restaurants/{restaurant.id}/'
         response = self.client.put(url, updated_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         restaurant.refresh_from_db()
         self.assertEqual(restaurant.name, 'Updated Restaurant')
-        self.assertEqual(restaurant.cuisine, 'French')
     
     def test_delete_restaurant(self):
         """Test deleting a restaurant."""
@@ -143,11 +176,11 @@ class RestaurantAPITest(APITestCase):
             place_id='ChIJN1t_tDeuEmsRUsoyG83frY4',
             name='Test Restaurant',
             address='123 Test Street, Test City',
-            latitude=Decimal('40.7128'),
-            longitude=Decimal('-74.0060'),
-            cuisine='Italian',
+            latitude=40.7128,
+            longitude=-74.0060,
             rating=Decimal('4.5')
         )
+        restaurant.cuisines.set([self.italian_cuisine])
         
         url = f'/api/v1/restaurants/{restaurant.id}/'
         response = self.client.delete(url)
@@ -156,39 +189,42 @@ class RestaurantAPITest(APITestCase):
     
     def test_filter_by_cuisine(self):
         """Test filtering restaurants by cuisine."""
-        Restaurant.objects.create(
+        italian_restaurant = Restaurant.objects.create(
             place_id='place1',
             name='Italian Restaurant',
-            address='123 Test Street',
-            cuisine='Italian'
+            address='123 Test Street'
         )
-        Restaurant.objects.create(
+        italian_restaurant.cuisines.set([self.italian_cuisine])
+        
+        french_restaurant = Restaurant.objects.create(
             place_id='place2',
             name='French Restaurant',
-            address='456 Test Avenue',
-            cuisine='French'
+            address='456 Test Avenue'
         )
+        french_restaurant.cuisines.set([self.french_cuisine])
         
         url = '/api/v1/restaurants/'
         response = self.client.get(url + '?cuisine=Italian')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
-        self.assertEqual(response.data['results'][0]['cuisine'], 'Italian')
+        self.assertEqual(response.data['results'][0]['name'], 'Italian Restaurant')
     
     def test_filter_by_name(self):
         """Test filtering restaurants by name."""
-        Restaurant.objects.create(
+        pizza_restaurant = Restaurant.objects.create(
             place_id='place1',
             name='Pizza Palace',
-            address='123 Test Street',
-            cuisine='Italian'
+            address='123 Test Street'
         )
-        Restaurant.objects.create(
+        pizza_restaurant.cuisines.set([self.italian_cuisine])
+        
+        american_cuisine = Cuisine.objects.create(name='American')
+        burger_restaurant = Restaurant.objects.create(
             place_id='place2',
             name='Burger Joint',
-            address='456 Test Avenue',
-            cuisine='American'
+            address='456 Test Avenue'
         )
+        burger_restaurant.cuisines.set([american_cuisine])
         
         url = '/api/v1/restaurants/'
         response = self.client.get(url + '?name=Pizza')
@@ -198,18 +234,20 @@ class RestaurantAPITest(APITestCase):
     
     def test_search_restaurants(self):
         """Test searching restaurants."""
-        Restaurant.objects.create(
+        pizza_restaurant = Restaurant.objects.create(
             place_id='place1',
             name='Delicious Pizza',
-            address='123 Pizza Street',
-            cuisine='Italian'
+            address='123 Pizza Street'
         )
-        Restaurant.objects.create(
+        pizza_restaurant.cuisines.set([self.italian_cuisine])
+        
+        american_cuisine = Cuisine.objects.create(name='American')
+        burger_restaurant = Restaurant.objects.create(
             place_id='place2',
             name='Burger Joint',
-            address='456 Test Avenue',
-            cuisine='American'
+            address='456 Test Avenue'
         )
+        burger_restaurant.cuisines.set([american_cuisine])
         
         url = '/api/v1/restaurants/'
         response = self.client.get(url + '?search=Pizza')

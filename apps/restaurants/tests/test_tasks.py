@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.utils import timezone
 from celery.result import AsyncResult
 
-from apps.restaurants.models import Restaurant
+from apps.restaurants.models import Restaurant, Cuisine
 from apps.restaurants.tasks import update_restaurant_info, update_all_restaurants, create_restaurant_from_places_data
 from apps.restaurants.services import GooglePlacesService
 
@@ -18,19 +18,21 @@ class RestaurantTasksTest(TestCase):
             place_id='ChIJN1t_tDeuEmsRUsoyG83frY4',
             name='Test Restaurant',
             address='123 Test Street, Test City',
-            latitude=Decimal('40.7128'),
-            longitude=Decimal('-74.0060'),
-            cuisine='Italian',
+            latitude=40.7128,
+            longitude=-74.0060,
             rating=Decimal('4.5')
         )
+        # Add cuisine to the restaurant
+        italian_cuisine = Cuisine.objects.create(name='Italian')
+        self.restaurant.cuisines.set([italian_cuisine])
         
         self.mock_places_data = {
             'place_id': 'ChIJN1t_tDeuEmsRUsoyG83frY4',
             'name': 'Updated Restaurant Name',
             'address': '456 Updated Street, Test City',
-            'latitude': Decimal('40.7500'),
-            'longitude': Decimal('-74.0100'),
-            'cuisine': 'French',
+            'latitude': 40.7500,
+            'longitude': -74.0100,
+            'cuisines': ['French Restaurant'],
             'rating': Decimal('4.8'),
             'business_status': 'OPERATIONAL'
         }
@@ -55,7 +57,7 @@ class RestaurantTasksTest(TestCase):
         # Verify the restaurant was updated
         self.restaurant.refresh_from_db()
         self.assertEqual(self.restaurant.name, 'Updated Restaurant Name')
-        self.assertEqual(self.restaurant.cuisine, 'French')
+        self.assertIn('cuisines', result['updated_fields'])
         self.assertEqual(self.restaurant.rating, Decimal('4.8'))
     
     @patch('apps.restaurants.tasks.GooglePlacesService')
@@ -161,22 +163,28 @@ class GooglePlacesServiceTest(TestCase):
     def setUp(self):
         self.service = GooglePlacesService()
     
-    def test_extract_cuisine_from_types(self):
+    def test_extract_cuisines_from_types(self):
         """Test cuisine extraction from Google Place types."""
         # Test specific cuisine types
         types = ['restaurant', 'italian_restaurant', 'food']
-        cuisine = self.service._extract_cuisine_from_types(types)
-        self.assertEqual(cuisine, 'Italian')
+        cuisines = self.service._extract_cuisines_from_types(types)
+        self.assertEqual(cuisines, ['Italian Restaurant'])
+        
+        # Test multiple specific cuisines
+        types = ['pizza_restaurant', 'italian_restaurant', 'fast_food_restaurant']
+        cuisines = self.service._extract_cuisines_from_types(types)
+        expected = ['Pizza Restaurant', 'Italian Restaurant', 'Fast Food Restaurant']
+        self.assertEqual(sorted(cuisines), sorted(expected))
         
         # Test generic restaurant type
         types = ['restaurant', 'food', 'establishment']
-        cuisine = self.service._extract_cuisine_from_types(types)
-        self.assertEqual(cuisine, 'Restaurant')
+        cuisines = self.service._extract_cuisines_from_types(types)
+        self.assertEqual(cuisines, ['Restaurant'])
         
         # Test no restaurant types
         types = ['store', 'establishment']
-        cuisine = self.service._extract_cuisine_from_types(types)
-        self.assertIsNone(cuisine)
+        cuisines = self.service._extract_cuisines_from_types(types)
+        self.assertEqual(cuisines, [])
     
     @patch('googlemaps.Client')
     def test_fetch_restaurant_details_success(self, mock_client_class):
@@ -211,7 +219,7 @@ class GooglePlacesServiceTest(TestCase):
         # Verify the result
         self.assertIsNotNone(result)
         self.assertEqual(result['name'], 'Test Restaurant')
-        self.assertEqual(result['cuisine'], 'Italian')
+        self.assertEqual(result['cuisines'], ['Italian Restaurant'])
         self.assertEqual(result['rating'], Decimal('4.5'))
     
     @patch('googlemaps.Client')
