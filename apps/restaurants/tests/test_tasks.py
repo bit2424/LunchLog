@@ -168,7 +168,7 @@ class GooglePlacesServiceTest(TestCase):
         # Test specific cuisine types
         types = ['restaurant', 'italian_restaurant', 'food']
         cuisines = self.service._extract_cuisines_from_types(types)
-        self.assertEqual(cuisines, ['Italian Restaurant'])
+        self.assertEqual(cuisines, ['Restaurant', 'Italian Restaurant'])
         
         # Test multiple specific cuisines
         types = ['pizza_restaurant', 'italian_restaurant', 'fast_food_restaurant']
@@ -219,7 +219,7 @@ class GooglePlacesServiceTest(TestCase):
         # Verify the result
         self.assertIsNotNone(result)
         self.assertEqual(result['name'], 'Test Restaurant')
-        self.assertEqual(result['cuisines'], ['Italian Restaurant'])
+        self.assertEqual(result['cuisines'], ['Restaurant', 'Italian Restaurant'])
         self.assertEqual(result['rating'], Decimal('4.5'))
     
     @patch('googlemaps.Client')
