@@ -13,11 +13,14 @@ services:
       - "9000:8000"
     depends_on:
       - db
+      - redis
     environment:
       - DATABASE_URL=postgresql://lunchlog:lunchlog123@db:5432/lunchlog
       - SECRET_KEY=dev-secret-key-change-in-production
       - DEBUG=True
       - ALLOWED_HOSTS=*
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     command: >
       bash -c "python manage.py migrate &&
                python manage.py runserver 0.0.0.0:8000"
@@ -40,6 +43,64 @@ services:
       retries: 5
     ports:
       - "5432:5432"
+
+  redis:
+    profiles:
+      - dev
+    container_name: redis
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  celery:
+    profiles:
+      - dev
+    container_name: celery
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    restart: always
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    environment:
+      - DATABASE_URL=postgresql://lunchlog:lunchlog123@db:5432/lunchlog
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - DEBUG=True
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    command: celery -A lunchlog worker --loglevel=info
+
+  celery-beat:
+    profiles:
+      - dev
+    container_name: celery-beat
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    restart: always
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    environment:
+      - DATABASE_URL=postgresql://lunchlog:lunchlog123@db:5432/lunchlog
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - DEBUG=True
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    command: celery -A lunchlog beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
 
   db_prod:
     profiles: 
@@ -102,3 +163,4 @@ services:
 volumes:
   postgres_data:  # Database volume
   lunchlog_logs:  # Logs volume
+  redis_data:  # Redis data volume
