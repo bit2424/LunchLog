@@ -302,16 +302,6 @@ def test_live_google_places_creates_and_updates_restaurant(db, external_api_key,
     assert receipt.restaurant is not None
     restaurant = receipt.restaurant
 
-    # After eager Celery, the stub should be updated with a real place_id and details
-    # print("--------------------------------")
-    # print("Restaurant details:")
-    # print(restaurant.place_id)
-    # print(restaurant.name)
-    # print(restaurant.address)
-    # print(restaurant.latitude)
-    # print(restaurant.longitude)
-    # print(restaurant.cuisine)
-    # print(restaurant.rating)
     
     restaurant.refresh_from_db()
     assert restaurant.place_id is not None
