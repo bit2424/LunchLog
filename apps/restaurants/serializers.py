@@ -107,3 +107,80 @@ class RestaurantListSerializer(RestaurantSerializer):
 class RestaurantDetailSerializer(RestaurantSerializer):
     """Detailed serializer with all fields for restaurant details."""
     pass  # Uses all fields from parent RestaurantSerializer
+
+
+class RecommendationSerializer(serializers.Serializer):
+    """Serializer for restaurant recommendations from Google Places."""
+    
+    place_id = serializers.CharField(max_length=255)
+    name = serializers.CharField(max_length=255)
+    rating = serializers.FloatField(required=False, allow_null=True)
+    price_level = serializers.IntegerField(required=False, allow_null=True)
+    vicinity = serializers.CharField(max_length=500, required=False, allow_null=True)
+    cuisines = serializers.ListField(
+        child=serializers.CharField(max_length=100),
+        required=False,
+        allow_empty=True
+    )
+    recommendation_type = serializers.CharField(max_length=50)
+    business_status = serializers.CharField(max_length=50, default='OPERATIONAL')
+    
+    # Reference location info
+    reference_location = serializers.DictField(required=False)
+    
+    # Additional fields for cuisine match recommendations
+    matched_cuisines = serializers.ListField(
+        child=serializers.CharField(max_length=100),
+        required=False,
+        allow_empty=True
+    )
+    
+    # Geometry information
+    geometry = serializers.DictField(required=False)
+    
+    def to_representation(self, instance):
+        """Custom representation to format the data nicely."""
+        data = super().to_representation(instance)
+        
+        # Add formatted address from vicinity
+        if data.get('vicinity'):
+            data['formatted_address'] = data['vicinity']
+        
+        # Add location coordinates if geometry is available
+        geometry = data.get('geometry', {})
+        location = geometry.get('location', {})
+        if location:
+            data['latitude'] = location.get('lat')
+            data['longitude'] = location.get('lng')
+        
+        # Format price level description
+        price_level = data.get('price_level')
+        if price_level is not None:
+            price_descriptions = {
+                0: 'Free',
+                1: 'Inexpensive',
+                2: 'Moderate',
+                3: 'Expensive',
+                4: 'Very Expensive'
+            }
+            data['price_description'] = price_descriptions.get(price_level, 'Unknown')
+        
+        return data
+
+
+class RecommendationResponseSerializer(serializers.Serializer):
+    """Serializer for recommendation API responses."""
+    
+    recommendation_type = serializers.CharField(max_length=50)
+    count = serializers.IntegerField()
+    recommendations = RecommendationSerializer(many=True)
+    user_context = serializers.DictField(required=False)
+
+
+class AllRecommendationsSerializer(serializers.Serializer):
+    """Serializer for all recommendation types response."""
+    
+    good = RecommendationSerializer(many=True)
+    cheap = RecommendationSerializer(many=True)
+    cuisine_match = RecommendationSerializer(many=True)
+    user_context = serializers.DictField(required=False)
