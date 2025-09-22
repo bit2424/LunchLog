@@ -214,22 +214,22 @@ Examples:
 
 ```bash
 # Create a user (session auth)
-curl -X POST http://localhost:8000/api/v1/auth/signup/ \
+curl -X POST http://localhost:9000/api/v1/auth/signup/ \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "changeme123"}'
 
 # Login (session auth)
-curl -X POST http://localhost:8000/api/v1/auth/login/ \
+curl -X POST http://localhost:9000/api/v1/auth/login/ \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "changeme123"}'
 
 # Obtain DRF token
-curl -X POST http://localhost:8000/api/v1/auth/token/ \
+curl -X POST http://localhost:9000/api/v1/auth/token/ \
   -H "Content-Type: application/json" \
   -d '{"username": "user@example.com", "password": "changeme123"}'
 
 # Create JWT
-curl -X POST http://localhost:8000/api/v1/auth/jwt/create/ \
+curl -X POST http://localhost:9000/api/v1/auth/jwt/create/ \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "changeme123"}'
 ```
@@ -246,11 +246,11 @@ Examples:
 
 ```bash
 # List (Token auth)
-curl -X GET http://localhost:8000/api/v1/receipts/ \
+curl -X GET http://localhost:9000/api/v1/receipts/ \
   -H "Authorization: Token YOUR_TOKEN"
 
 # Create (multipart). Provide restaurant_id OR restaurant_name + address
-curl -X POST http://localhost:8000/api/v1/receipts/ \
+curl -X POST http://localhost:9000/api/v1/receipts/ \
   -H "Authorization: Token YOUR_TOKEN" \
   -F "date=2025-09-19" \
   -F "price=12.50" \
@@ -258,7 +258,7 @@ curl -X POST http://localhost:8000/api/v1/receipts/ \
   -F "image=@/absolute/path/to/receipt.jpg"
 
 # OR name/address instead of restaurant_id
-curl -X POST http://localhost:8000/api/v1/receipts/ \
+curl -X POST http://localhost:9000/api/v1/receipts/ \
   -H "Authorization: Token YOUR_TOKEN" \
   -F "date=2025-09-19" \
   -F "price=12.50" \
@@ -279,14 +279,14 @@ Examples:
 
 ```bash
 # List (JWT)
-ACCESS=$(curl -s -X POST http://localhost:8000/api/v1/auth/jwt/create/ \
+ACCESS=$(curl -s -X POST http://localhost:9000/api/v1/auth/jwt/create/ \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "changeme123"}' | jq -r .access)
 
-curl -H "Authorization: Bearer $ACCESS" http://localhost:8000/api/v1/restaurants/
+curl -H "Authorization: Bearer $ACCESS" http://localhost:9000/api/v1/restaurants/
 
 # Create
-curl -X POST http://localhost:8000/api/v1/restaurants/ \
+curl -X POST http://localhost:9000/api/v1/restaurants/ \
   -H "Authorization: Bearer $ACCESS" \
   -H "Content-Type: application/json" \
   -d '{
@@ -317,19 +317,19 @@ All recommendation endpoints support these optional parameters:
 ```bash
 # Get good restaurant recommendations
 curl -H "Authorization: Bearer $ACCESS" \
-  "http://localhost:8000/api/v1/restaurants/recommendations/good/?limit=10&radius=1500"
+  "http://localhost:9000/api/v1/restaurants/recommendations/good/?limit=10&radius=1500"
 
 # Get budget-friendly recommendations
 curl -H "Authorization: Bearer $ACCESS" \
-  "http://localhost:8000/api/v1/restaurants/recommendations/cheap/?limit=15"
+  "http://localhost:9000/api/v1/restaurants/recommendations/cheap/?limit=15"
 
 # Get cuisine-matched recommendations
 curl -H "Authorization: Bearer $ACCESS" \
-  "http://localhost:8000/api/v1/restaurants/recommendations/cuisine-match/"
+  "http://localhost:9000/api/v1/restaurants/recommendations/cuisine-match/"
 
 # Get all recommendation types
 curl -H "Authorization: Bearer $ACCESS" \
-  "http://localhost:8000/api/v1/restaurants/recommendations/all/?limit=5"
+  "http://localhost:9000/api/v1/restaurants/recommendations/all/?limit=5"
 ```
 
 #### Response Format
