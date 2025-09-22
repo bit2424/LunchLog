@@ -5,24 +5,60 @@ Office Lunch Receipt Management and Recommendation System - REST API Backend
 ## Table of Contents
 
 - [Overview](#overview)
+- [Quick Start](#quick-start)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
 - [Project Architecture](#project-architecture)
 - [Data Schemas](#data-schemas)
+- [Prerequisites](#prerequisites)
 - [API Endpoints](#api-endpoints)
+  - [API Documentation (Swagger)](#api-documentation-swagger)
   - [Authentication](#authentication)
   - [Receipts](#receipts)
   - [Restaurants](#restaurants)
+  - [Recommendation System](#recommendation-system)
 - [Running the Project (Docker-first)](#running-the-project-docker-first)
+  - [For Development](#for-development)
+  - [For Production](#for-production)
+  - [Available Profiles](#available-profiles)
+  - [Manual Setup (Non-Docker)](#manual-setup-non-docker)
+- [Available Commands](#available-commands)
 - [Makefile Quick Reference](#makefile-quick-reference)
 - [Environment Variables](#environment-variables)
 - [Development](#development)
+  - [Running Tests](#running-tests)
+  - [Code Quality](#code-quality)
+  - [Database Management](#database-management)
 - [Major Decisions](#major-decisions)
 - [Future Improvements](#future-improvements)
 
 ## Overview
 
 LunchLog is a Django REST API to manage lunch receipts and recommend restaurants. Users can upload receipt images, link them to restaurants, and browse a curated database. Background jobs enrich restaurant data (e.g., via Google Places). Media files are stored locally in development and can be stored on AWS S3 in production.
+
+## Project Structure
+
+```
+lunchlog/
+├── apps/                  # Django applications
+│   ├── receipts/          # Receipt management
+│   └── restaurants/       # Restaurant database
+├── lunchlog/              # Django project settings
+│   ├── settings/          # Environment-specific settings
+│   ├── authentication.py  # Custom auth classes
+│   └── permissions.py     # Custom permissions
+├── tests/                 # Project-wide tests
+├── fixtures/              # Initial data fixtures
+├── docker-compose.yml     # Container configuration
+└── Makefile               # Development commands
+```
+## Quick Start
+
+1. Initialize environment: `make env` then edit `.env`, even if you don't edit the `.env` file everything will work.
+2. Start services: `make docker-setup PROFILE=dev`
+4. Run tests: `make test-coverage`
+5. API running at `http://localhost:9000/api/v1/`
 
 ## Features
 
@@ -36,11 +72,16 @@ LunchLog is a Django REST API to manage lunch receipts and recommend restaurants
 
 - **Backend**: Django 4.2+ with Django REST Framework
 - **Database**: PostgreSQL
+- **API Documentation**: Swagger UI & ReDoc (via drf-yasg)
 - **Testing**: pytest with coverage reporting
 - **Code Quality**: black, isort, flake8
 - **Containerization**: Docker Compose with profile-based deployments
 
 ## Project Architecture
+
+Infrastructure Diagram:
+
+![Infrastructure Diagram](./documentation/Infra_Diagram.png)
 
 - **Apps**: `users`, `receipts`, `restaurants`
 - **API**: Django REST Framework routers under `/api/v1/`
@@ -56,107 +97,46 @@ Data flow highlights:
 
 ## Data Schemas
 
-Note: Simplified summary. See models for authoritative definitions.
+ER diagram:
 
-- Receipt
-  - id: integer
-  - user: FK to `users.User`
-  - date: date (YYYY-MM-DD)
-  - price: decimal(10,2)
-  - restaurant: FK to `restaurants.Restaurant` (nullable)
-  - restaurant_name: string (nullable)
-  - address: text (nullable)
-  - image: file upload; image_url derived in responses
-  - created_at / updated_at: timestamps
+![ER diagram](./documentation/ER_diagram.png)
 
-- Restaurant
-  - id: UUID (primary key)
-  - place_id: string (Google Places ID, unique)
-  - name: string
-  - address: text
-  - latitude / longitude: float (nullable)
-  - cuisines: many-to-many (if enabled)
-  - rating: decimal(3,2) 0.00–5.00 (nullable)
-  - updated_at: timestamp
-
-## Quick Start
-
-### Prerequisites
-
-- Python 3.11+
-- Docker and Docker Compose
+## Prerequisites
+- Docker and Docker Compose version 2.24.0+
 - Poetry (optional, but recommended)
+- Python 3.11+ (optional, to make local changes)
 
-### Development Setup
+## Running the Project (Docker-first)
 
-1. **Clone and setup environment**:
-```bash
-git clone <repository-url>
-cd lunchlog
-make env  # Create .env from env.example
-```
+### For Development:
+1. Initialize environment: `make env` then edit `.env`, even if you don't edit the `.env` file everything will work.
+2. Start services: `make docker-setup`
+3. Create admin user: `make createsuperuser-docker`
+4. API running at `http://localhost:9000/api/v1/`
 
-2. **Install dependencies**:
-```bash
-make install
-```
-
-3. **Start services with development profile**:
-```bash
-make up PROFILE=dev
-```
-
-This will:
-- Start PostgreSQL container
-- Run database migrations
-- Start the development server with hot reloading
-
-### Production Setup
-
-1. **Start services with production profile**:
-```bash
-make up PROFILE=prod
-```
-
-This will:
-- Start PostgreSQL container
-- Run with Gunicorn server
-- Enable production settings
+### For Production: 
+1. You need to make sure to create the necessary SSL certificates and put them in the `deploy/certs` directory.
+2. Run`make docker-setup PROFILE=prod` in step 2 above, and extra proxy container will be started to route to the production API.
+3. API running at `https://localhost/api/v1/`
 
 ### Available Profiles
 
 The system supports different deployment profiles:
 
-- **dev**: Development mode with hot reloading
+- **dev**: Development mode
   ```bash
-  make up PROFILE=dev
+  make docker-setup PROFILE=dev
   ```
-- **prod**: Production mode with Gunicorn
+- **prod**: Production mode 
   ```bash
-  make up PROFILE=prod
+  make docker-setup PROFILE=prod
   ```
 
 You can also set the profile for your entire session:
 ```bash
 export PROFILE=dev
-make build
-make up
+make docker-setup
 make logs
-```
-
-### Docker Commands with Profiles
-
-```bash
-# Start containers with specific profile
-make up PROFILE=dev
-
-# Build containers for specific profile
-make build PROFILE=prod
-
-# View logs for current profile
-make logs
-
-# Stop containers for current profile
 make down
 ```
 
@@ -186,33 +166,30 @@ Run `make help` to see all available commands:
 
 ```bash
 make help           # Show help (displays current profile)
+make docker-setup   # Complete development setup in Docker
 make up             # Start containers
 make down           # Stop containers
 make migrate        # Run migrations
 make test           # Run tests
+make test-coverage  # Run tests with coverage report
 make lint           # Run linting
 make format         # Format code
-make seed           # Load initial data
-```
-
-## Project Structure
-
-```
-lunchlog/
-├── apps/                  # Django applications
-│   ├── receipts/          # Receipt management
-│   └── restaurants/       # Restaurant database
-├── lunchlog/              # Django project settings
-│   ├── settings/          # Environment-specific settings
-│   ├── authentication.py  # Custom auth classes
-│   └── permissions.py     # Custom permissions
-├── tests/                 # Project-wide tests
-├── fixtures/              # Initial data fixtures
-├── docker-compose.yml     # Container configuration
-└── Makefile               # Development commands
+...
 ```
 
 ## API Endpoints
+
+### API Documentation (Swagger)
+
+Interactive API documentation is available via Swagger UI and ReDoc:
+
+- **Swagger UI**: `http://localhost:9000/swagger/` (development) or `https://localhost/swagger/` (production)
+
+The documentation includes:
+- Interactive API explorer with "Try it out" functionality
+- Complete schema definitions for all models
+- Authentication examples for all three auth methods
+- Detailed documentation for the recommendation system endpoints
 
 ### Authentication
 
@@ -314,15 +291,75 @@ curl -X POST http://localhost:8000/api/v1/restaurants/ \
       }'
 ```
 
-## Running the Project (Docker-first)
+### Recommendation System
 
-1. Initialize environment: `make env` then edit `.env`
-2. Start services: `make up PROFILE=dev`
-3. Run migrations: `make migrate-docker`
-4. Create admin user: `make createsuperuser-docker`
-5. Open API at `http://localhost:8000/api/v1/`
+- `GET /api/v1/restaurants/recommendations/good/` - High-quality restaurant recommendations
+- `GET /api/v1/restaurants/recommendations/cheap/` - Budget-friendly restaurant recommendations  
+- `GET /api/v1/restaurants/recommendations/cuisine-match/` - Restaurants matching user's preferred cuisines
+- `GET /api/v1/restaurants/recommendations/all/` - All recommendation types in a single response
 
-Production: `make up PROFILE=prod` (Gunicorn, production settings).
+#### Query Parameters
+
+All recommendation endpoints support these optional parameters:
+- `limit` - Number of recommendations to return (default: 20 for individual types, 10 for all)
+- `radius` - Search radius in meters around frequent locations (default: 2000)
+- `search_limit` - Max results per location search (default: 20)
+
+#### Examples
+
+```bash
+# Get good restaurant recommendations
+curl -H "Authorization: Bearer $ACCESS" \
+  "http://localhost:8000/api/v1/restaurants/recommendations/good/?limit=10&radius=1500"
+
+# Get budget-friendly recommendations
+curl -H "Authorization: Bearer $ACCESS" \
+  "http://localhost:8000/api/v1/restaurants/recommendations/cheap/?limit=15"
+
+# Get cuisine-matched recommendations
+curl -H "Authorization: Bearer $ACCESS" \
+  "http://localhost:8000/api/v1/restaurants/recommendations/cuisine-match/"
+
+# Get all recommendation types
+curl -H "Authorization: Bearer $ACCESS" \
+  "http://localhost:8000/api/v1/restaurants/recommendations/all/?limit=5"
+```
+
+#### Response Format
+
+Each recommendation includes:
+- Restaurant details (name, address, rating, etc.)
+- Recommendation type and reason
+- User context (frequent restaurants, preferred cuisines)
+- Google Places enrichment data when available
+
+Example response:
+```json
+{
+  "recommendation_type": "good",
+  "count": 5,
+  "recommendations": [
+    {
+      "place_id": "ChIJ...",
+      "name": "Amazing Bistro",
+      "rating": 4.8,
+      "price_level": 2,
+      "vicinity": "123 Food St, City",
+      "cuisines": ["French", "European"],
+      "recommendation_type": "good",
+      "business_status": "OPERATIONAL"
+    }
+  ],
+  "user_context": {
+    "frequent_restaurants": [
+      {"name": "Regular Spot", "visit_count": 15}
+    ],
+    "preferred_cuisines": [
+      {"name": "Italian", "visit_count": 8}
+    ]
+  }
+}
+```
 
 ## Development
 
