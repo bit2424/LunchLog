@@ -29,6 +29,10 @@ from django.contrib.auth import get_user_model
 from rest_framework.authtoken.models import Token
 from django.shortcuts import render
 from django.conf import settings
+from django.template.response import TemplateResponse
+from django.http import HttpResponse
+from rest_framework.response import Response as DRFResponse
+
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -61,6 +65,134 @@ schema_view = get_schema_view(
     permission_classes=(permissions.AllowAny,),
 )
 
+
+def swagger_with_preauth(request, *args, **kwargs):
+    """Render Swagger UI with pre-populated Bearer token from default user."""
+    token_value = ""
+    try:
+        if settings.DEBUG:
+            User = get_user_model()
+            default_email = getattr(settings, "DEFAULT_USER_EMAIL", "basic@example.com")
+            user = User.objects.filter(email=default_email).first()
+            if user:
+                token, _ = Token.objects.get_or_create(user=user)
+                token_value = token.key
+    except Exception:
+        # Fallback if user doesn't exist or token creation fails
+        token_value = ""
+
+    # Get the standard Swagger UI response
+    response = schema_view.with_ui("swagger", cache_timeout=0)(request, *args, **kwargs)
+
+    # If we have a token, inject JavaScript to pre-authorize
+    if token_value:
+        # Keep the raw token value for DRF Token auth, prepare Bearer version for JWT
+        raw_token = token_value
+        bearer_token = (
+            f"Bearer {token_value}"
+            if not token_value.startswith("Bearer ")
+            else token_value
+        )
+
+        # Inject script to auto-authorize with the token
+        auth_script = f"""
+<script>
+console.log('LunchLog: Script injected successfully!');
+window.LUNCHLOG_RAW_TOKEN = '{raw_token}';
+window.LUNCHLOG_BEARER_TOKEN = '{bearer_token}';
+
+// Auto-authorization for LunchLog API in development
+window.addEventListener('load', function() {{
+    console.log('LunchLog: Page loaded, starting auto-authorization...');
+    
+    // Wait for Swagger UI to fully initialize
+    let attempts = 0;
+    const maxAttempts = 50;
+    
+    function tryAuthorize() {{
+        attempts++;
+        console.log('LunchLog: Attempt', attempts, 'to find Swagger UI...');
+        
+        if (window.ui && window.ui.preauthorizeApiKey) {{
+            console.log('LunchLog: Found Swagger UI! Auto-authorizing...');
+            
+            try {{
+                // Preauthorize Token auth (DRF Token) - format: "Token <token>"
+                window.ui.preauthorizeApiKey('Token', 'Token {raw_token}');
+                console.log('LunchLog: ✅ DRF Token auth configured successfully');
+            }} catch (e) {{
+                console.warn('LunchLog: ❌ Token auth failed:', e);
+            }}
+            
+            try {{
+                // Set up Bearer auth for JWT - format: "Bearer <token>"
+                window.ui.preauthorizeApiKey('Bearer', '{bearer_token}');
+                console.log('LunchLog: ✅ Bearer auth configured successfully');
+            }} catch (e) {{
+                console.warn('LunchLog: ❌ Bearer auth failed:', e);
+            }}
+            
+            console.log('LunchLog: 🎉 Auto-authorization complete - you can now test protected endpoints!');
+            return;
+        }}
+        
+        if (attempts < maxAttempts) {{
+            setTimeout(tryAuthorize, 200);
+        }} else {{
+            console.warn('LunchLog: ❌ Failed to auto-authorize - Swagger UI not ready after ' + maxAttempts + ' attempts');
+            console.log('LunchLog: Available objects:', {{
+                'window.ui': !!window.ui,
+                'window.SwaggerUIBundle': !!window.SwaggerUIBundle,
+                'document.querySelector(".swagger-ui")': !!document.querySelector('.swagger-ui')
+            }});
+        }}
+    }}
+    
+    // Start trying to authorize
+    tryAuthorize();
+}});
+</script>
+"""
+        # Inject the script by modifying the response
+        try:
+
+            # Handle DRF Response (force render)
+            if isinstance(response, DRFResponse):
+                response.render()
+            elif isinstance(response, TemplateResponse):
+                response.render()
+
+            # Get content safely
+            if hasattr(response, "content"):
+                try:
+                    content = response.content.decode("utf-8")
+
+                    # Inject script before closing body tag
+                    if "</body>" in content:
+                        content = content.replace("</body>", auth_script + "</body>")
+
+                        # Create new HttpResponse with modified content
+                        new_response = HttpResponse(
+                            content,
+                            content_type=response.get("Content-Type", "text/html"),
+                            status=response.status_code,
+                        )
+
+                        # Copy headers
+                        for key, value in response.items():
+                            new_response[key] = value
+
+                        return new_response
+                except (UnicodeDecodeError, AttributeError):
+                    # If we can't decode or modify content, return original
+                    pass
+        except Exception:
+            # If anything fails, just return the original response
+            pass
+
+    return response
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     # API Documentation
@@ -71,7 +203,7 @@ urlpatterns = [
     ),
     re_path(
         r"^swagger/$",
-        schema_view.with_ui("swagger", cache_timeout=0),
+        swagger_with_preauth,
         name="schema-swagger-ui",
     ),
     re_path(
