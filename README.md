@@ -190,6 +190,8 @@ Interactive API documentation is available via Swagger UI and ReDoc:
 
 The documentation includes:
 - Interactive API explorer with "Try it out" functionality
+- Remember to create a jwt token to use the api and put it in the "Authorization" header by clicking on the "Authorize" button. Don't forget to put the "Bearer " prefix in front of the token.
+- You can use the default user "user@example.com" with password "changeme123" to test the api.
 - Complete schema definitions for all models
 - Authentication examples for all three auth methods
 - Detailed documentation for the recommendation system endpoints
