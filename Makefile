@@ -4,8 +4,6 @@
 # Default profile is development
 PROFILE ?= dev
 
-.PHONY: help up down migrate createsuperuser test lint format seed install dev-setup clean logs shell
-
 # Default target
 help: ## Show this help message
 	@echo "LunchLog - Office Lunch Receipt Management and Recommendation System API"
@@ -15,17 +13,13 @@ help: ## Show this help message
 
 # Docker commands
 up: ## Start all containers with specified profile (dev or prod)
+	docker compose --profile $(PROFILE) up -d db
+	@echo "Waiting for database to be ready..."
+	@timeout 30 bash -c 'until docker compose exec -T db pg_isready -U lunchlog; do sleep 1; done' || echo "Database might not be ready yet";
+
 	docker compose --profile $(PROFILE) up -d
 	@echo "Containers started with profile: $(PROFILE)"
-	@if [ "$(PROFILE)" = "dev" ]; then\
-		@echo "Waiting for database to be ready..."\
-		@timeout 30 bash -c 'until docker compose exec -T db pg_isready -U lunchlog; do sleep 1; done' || echo "Database might not be ready yet"; fi
 	
-up-db-prod: ## Start only the database container
-	docker compose --profile $(PROFILE) up -d db_prod
-	@echo "Waiting for database to be ready..."
-	@timeout 30 bash -c 'until docker compose exec -T db_prod pg_isready -U lunchlog; do sleep 1; done' || echo "Database might not be ready yet";
-
 down: ## Stop and remove containers
 	docker compose --profile prod down; docker compose --profile dev down;
 
@@ -41,18 +35,8 @@ restart-backend: ## Restart only the backend container
 logs: ## Show container logs
 	docker compose --profile $(PROFILE) logs -f
 
-# Database commands
-migrate: ## Run Django migrations
-	python manage.py migrate
-
 migrate-docker: ## Run Django migrations in Docker
-	@if [ "$(PROFILE)" = "prod" ]; then\
-		docker exec backend_prod python manage.py migrate; fi
-	@if [ "$(PROFILE)" = "dev" ]; then\
-		docker exec backend python manage.py migrate; fi
-
-makemigrations: ## Create new Django migrations
-	python manage.py makemigrations
+	docker exec backend python manage.py migrate;
 
 makemigrations-docker: ## Create new Django migrations in Docker
 	docker exec backend python manage.py makemigrations
@@ -68,26 +52,16 @@ reset-db: ## Reset database (WARNING: destroys all data)
 		echo "Aborted."; \
 	fi
 
-# User management
-createsuperuser: ## Create Django superuser
-	python manage.py createsuperuser
 
 createsuperuser-docker: ## Create Django superuser in Docker
 	docker exec backend python manage.py createsuperuser
 
-# Development commands
-shell: ## Open Django shell
-	python manage.py shell
-
-runserver: ## Run Django development server
-	python manage.py runserver
-
 # Testing
 test: ## Run all tests
-	docker exec backend pytest -v
+	docker exec -e DJANGO_SETTINGS_MODULE=lunchlog.settings.test backend pytest -v
 
 test-coverage: ## Run tests with coverage report
-	docker compose exec backend pytest --cov=. --cov-report=html --cov-report=term-missing
+	docker compose exec -e DJANGO_SETTINGS_MODULE=lunchlog.settings.test backend pytest --cov=. --cov-report=html --cov-report=term-missing
 
 # Code quality
 lint: ## Run linting (flake8)
@@ -117,17 +91,20 @@ install: ## Install Python dependencies
 		echo "Poetry not found. Install manually or use pip."; \
 	fi
 
-dev-setup: install up migrate  ## Complete development setup to run locally
+local-setup: install up migrate  ## Complete development setup to run locally
 	@echo "Development environment setup complete!"
 	@echo "You can now run 'make runserver' to start the development server"
 
-dev-setup-docker: down build up migrate-docker ## Complete development setup in Docker
+docker-setup: down build up migrate-docker ## Complete development setup in Docker
+	
 	@echo "Development environment setup complete!"
-	@echo "You can now access the API at http://localhost:9000/api/v1/"
-
-prod-setup: down build up-db-prod up migrate-docker ## Complete production setup in Docker
-	@echo "Production environment setup complete!"
-	@echo "You can now access the API at https://localhost/api/v1/"
+	@if [ "$(PROFILE)" = "prod" ]; then \
+		echo "You can now access the API at https://localhost/api/v1/"; \
+	elif [ "$(PROFILE)" = "dev" ]; then \
+		echo "You can now access the API at http://localhost:9000/api/v1/"; \
+	else \
+		echo "You can now access the API at http://localhost:9000/api/v1/"; \
+	fi
 
 # Utility commands
 clean: ## Clean up temporary files
@@ -156,8 +133,5 @@ env: ## Create .env file from .env.example
 		echo ".env file already exists"; \
 	fi
 
-# Monitoring
-check: ## Run all checks (tests, linting, format)
-	make format-check
-	make lint
-	make test
+
+precommit: format test ## Run all checks (tests, linting, format)
