@@ -5,6 +5,8 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Q
 from django.http import Http404
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 from .models import Receipt
 from .serializers import ReceiptSerializer, ReceiptCreateSerializer, ReceiptListSerializer
@@ -76,6 +78,23 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         response_serializer = ReceiptSerializer(receipt, context={'request': request})
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
     
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                'month',
+                openapi.IN_QUERY,
+                description="Optional month filter in format YYYY-MM (e.g., 2024-01). If provided, only receipts from this month will be returned.",
+                type=openapi.TYPE_STRING,
+                required=False,
+                pattern=r'^\d{4}-\d{2}$'
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                description="List of receipts (optionally filtered by month)"
+            )
+        }
+    )
     def list(self, request, *args, **kwargs):
         """List user's receipts with optional filtering."""
         queryset = self.get_queryset()
@@ -112,6 +131,35 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
     
+    @swagger_auto_schema(
+        method='get',
+        manual_parameters=[
+            openapi.Parameter(
+                'month',
+                openapi.IN_QUERY,
+                description="Month filter in format YYYY-MM (e.g., 2024-01)",
+                type=openapi.TYPE_STRING,
+                required=True,
+                pattern=r'^\d{4}-\d{2}$'
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                description="Monthly summary data",
+                examples={
+                    "application/json": {
+                        "month": "2024-01",
+                        "total_count": 15,
+                        "total_amount": "234.56",
+                        "receipts": []
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Bad request - invalid or missing month parameter"
+            )
+        }
+    )
     @action(detail=False, methods=['get'])
     def monthly_summary(self, request):
         """
