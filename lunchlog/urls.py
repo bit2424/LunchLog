@@ -14,6 +14,7 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 from argparse import Namespace
 from django.conf import settings
 from django.conf.urls.static import static
@@ -32,7 +33,7 @@ from django.conf import settings
 schema_view = get_schema_view(
     openapi.Info(
         title="LunchLog API",
-        default_version='v1',
+        default_version="v1",
         description="""
         LunchLog - Office Lunch Receipt Management and Recommendation System - REST API Backend
         
@@ -55,27 +56,48 @@ schema_view = get_schema_view(
         - **Cuisine Match**: Restaurants matching your preferred cuisines
         - **All Recommendations**: Combined view of all recommendation types
         """,
-
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
 )
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    
+    path("admin/", admin.site.urls),
     # API Documentation
-    re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
-    re_path(r'^swagger/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    re_path(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
-    
+    re_path(
+        r"^swagger(?P<format>\.json|\.yaml)$",
+        schema_view.without_ui(cache_timeout=0),
+        name="schema-json",
+    ),
+    re_path(
+        r"^swagger/$",
+        schema_view.with_ui("swagger", cache_timeout=0),
+        name="schema-swagger-ui",
+    ),
+    re_path(
+        r"^redoc/$", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"
+    ),
     # API Endpoints
-    path('api/v1/', include([
-        path('', include(('apps.users.urls', 'users'), namespace='users')),
-        path('auth/token/', obtain_auth_token, name='api_token_auth'),
-        path('receipts/', include(('apps.receipts.urls', 'receipts'), namespace='receipts')),
-        path('restaurants/', include(('apps.restaurants.urls', 'restaurants'), namespace='restaurants')),
-    ])),
+    path(
+        "api/v1/",
+        include(
+            [
+                path("", include(("apps.users.urls", "users"), namespace="users")),
+                path("auth/token/", obtain_auth_token, name="api_token_auth"),
+                path(
+                    "receipts/",
+                    include(("apps.receipts.urls", "receipts"), namespace="receipts"),
+                ),
+                path(
+                    "restaurants/",
+                    include(
+                        ("apps.restaurants.urls", "restaurants"),
+                        namespace="restaurants",
+                    ),
+                ),
+            ]
+        ),
+    ),
 ]
 
 # Serve media files in development

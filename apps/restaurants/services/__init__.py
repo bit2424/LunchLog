@@ -7,7 +7,7 @@ import importlib.util
 import os
 
 # Get the path to the parent services.py file
-services_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'services.py')
+services_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "services.py")
 
 # Load the services module
 spec = importlib.util.spec_from_file_location("main_services", services_path)
@@ -17,4 +17,4 @@ spec.loader.exec_module(main_services)
 # Import GooglePlacesService
 GooglePlacesService = main_services.GooglePlacesService
 
-__all__ = ['GooglePlacesService']
+__all__ = ["GooglePlacesService"]

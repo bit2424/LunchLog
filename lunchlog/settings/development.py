@@ -8,25 +8,27 @@ from .base import *
 DEBUG = True
 
 # Email backend for development
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # Development-specific apps (uncomment django_extensions after installing)
 INSTALLED_APPS += [
-    'django_extensions',
+    "django_extensions",
 ]
 
 # Allow all hosts in development
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ["*"]
 
 # Development database (PostgreSQL)
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'lunchlog',
-        'USER': 'lunchlog',
-        'PASSWORD': 'lunchlog123',
-        'HOST': config('DB_HOST', default='db'),  # Use 'db' for Docker, 'localhost' otherwise
-        'PORT': '5432',
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "lunchlog",
+        "USER": "lunchlog",
+        "PASSWORD": "lunchlog123",
+        "HOST": config(
+            "DB_HOST", default="db"
+        ),  # Use 'db' for Docker, 'localhost' otherwise
+        "PORT": "5432",
     }
 }
 

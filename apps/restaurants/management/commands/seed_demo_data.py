@@ -56,7 +56,9 @@ class Command(BaseCommand):
         if created:
             user.set_password("basic123")
             user.save()
-            self.stdout.write("Created demo user basic@example.com with password 'basic123'")
+            self.stdout.write(
+                "Created demo user basic@example.com with password 'basic123'"
+            )
         else:
             self.stdout.write("Found existing demo user basic@example.com")
         return user
@@ -65,7 +67,9 @@ class Command(BaseCommand):
         Receipt.objects.filter(user=user).delete()
         UserRestaurantVisit.objects.filter(user=user).delete()
         UserCuisineStat.objects.filter(user=user).delete()
-        self.stdout.write("Deleted existing receipts, visits and cuisine stats for demo user")
+        self.stdout.write(
+            "Deleted existing receipts, visits and cuisine stats for demo user"
+        )
 
     def _ensure_cuisines(self):
         cuisine_names = [
@@ -156,7 +160,9 @@ class Command(BaseCommand):
     def _ensure_visits_and_cuisine_stats(self, user, restaurants, cuisines_by_name):
         # Simulate visit counts based on cuisine preferences
         preferred_cuisines = ["Japanese", "Mediterranean", "Italian"]
-        cuisine_weights = {name: (5 if name in preferred_cuisines else 2) for name in cuisines_by_name}
+        cuisine_weights = {
+            name: (5 if name in preferred_cuisines else 2) for name in cuisines_by_name
+        }
 
         for cuisine_name, cuisine in cuisines_by_name.items():
             total_visits = random.randint(3, 12) * cuisine_weights[cuisine_name]
@@ -168,7 +174,9 @@ class Command(BaseCommand):
         for restaurant in restaurants:
             base = cuisine_weights[restaurant.cuisines.first().name]
             visit_count = random.randint(3, 10) * base
-            visit, _ = UserRestaurantVisit.objects.get_or_create(user=user, restaurant=restaurant)
+            visit, _ = UserRestaurantVisit.objects.get_or_create(
+                user=user, restaurant=restaurant
+            )
             visit.visit_count = visit_count
             visit.last_visit = today - timedelta(days=random.randint(0, 60))
             visit.save()
@@ -198,7 +206,13 @@ class Command(BaseCommand):
             )
 
             # attach tiny image
-            image_content = self._generate_tiny_image(color=(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
+            image_content = self._generate_tiny_image(
+                color=(
+                    random.randint(0, 255),
+                    random.randint(0, 255),
+                    random.randint(0, 255),
+                )
+            )
             filename = f"receipt-{uuid.uuid4().hex[:8]}.png"
             receipt.image.save(filename, image_content, save=False)
             receipt.save()
@@ -211,5 +225,3 @@ class Command(BaseCommand):
         buffer = io.BytesIO()
         img.save(buffer, format="PNG")
         return ContentFile(buffer.getvalue(), name="receipt.png")
-
-

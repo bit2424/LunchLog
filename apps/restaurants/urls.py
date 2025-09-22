@@ -8,10 +8,10 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 router = DefaultRouter()
-router.register(r'', views.RestaurantViewSet)
+router.register(r"", views.RestaurantViewSet)
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path("", include(router.urls)),
 ]
 
-app_name = 'restaurants'
+app_name = "restaurants"

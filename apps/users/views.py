@@ -16,9 +16,10 @@ from rest_framework_simplejwt.views import (
 from .serializers import UserSerializer, AuthTokenSerializer
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+@method_decorator(csrf_exempt, name="dispatch")
 class CreateUserView(generics.CreateAPIView):
     """Create a new user in the system and log them in."""
+
     serializer_class = UserSerializer
     permission_classes = (AllowAny,)
 
@@ -26,35 +27,33 @@ class CreateUserView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        
+
         # Log the user in
         login(request, user)
-        
+
         headers = self.get_success_headers(serializer.data)
         return Response(
-            serializer.data, 
-            status=status.HTTP_201_CREATED, 
-            headers=headers
+            serializer.data, status=status.HTTP_201_CREATED, headers=headers
         )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+@method_decorator(csrf_exempt, name="dispatch")
 class LoginView(APIView):
     """Login endpoint that creates a session."""
+
     serializer_class = AuthTokenSerializer
     permission_classes = (AllowAny,)
 
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(
-            data=request.data,
-            context={'request': request}
+            data=request.data, context={"request": request}
         )
         serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data['user']
-        
+        user = serializer.validated_data["user"]
+
         # Create the session
         login(request, user)
-        
+
         # Return user data
         user_serializer = UserSerializer(user)
         return Response(user_serializer.data)
@@ -62,6 +61,7 @@ class LoginView(APIView):
 
 class CurrentUserView(generics.RetrieveUpdateAPIView):
     """Get or update the current authenticated user's profile."""
+
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -74,11 +74,11 @@ class CurrentUserView(generics.RetrieveUpdateAPIView):
 class TokenObtainPairView(SimpleJWTTokenObtainPairView):
     """
     JWT Token Creation - Obtain access and refresh tokens.
-    
+
     Use this endpoint to get JWT tokens for authentication. In development,
     you can use the default user credentials provided below.
     """
-    
+
     @swagger_auto_schema(
         operation_summary="Create JWT Token Pair",
         operation_description="""
@@ -92,21 +92,21 @@ class TokenObtainPairView(SimpleJWTTokenObtainPairView):
         """,
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
-            required=['email', 'password'],
+            required=["email", "password"],
             properties={
-                'email': openapi.Schema(
+                "email": openapi.Schema(
                     type=openapi.TYPE_STRING,
                     format=openapi.FORMAT_EMAIL,
                     description="User's email address",
-                    example="basic@example.com"
+                    example="basic@example.com",
                 ),
-                'password': openapi.Schema(
+                "password": openapi.Schema(
                     type=openapi.TYPE_STRING,
                     format=openapi.FORMAT_PASSWORD,
                     description="User's password",
-                    example="basic123"
+                    example="basic123",
                 ),
-            }
+            },
         ),
         responses={
             200: openapi.Response(
@@ -114,9 +114,9 @@ class TokenObtainPairView(SimpleJWTTokenObtainPairView):
                 examples={
                     "application/json": {
                         "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-                        "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+                        "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
                     }
-                }
+                },
             ),
             401: openapi.Response(
                 description="Invalid credentials",
@@ -124,10 +124,10 @@ class TokenObtainPairView(SimpleJWTTokenObtainPairView):
                     "application/json": {
                         "detail": "No active account found with the given credentials"
                     }
-                }
-            )
+                },
+            ),
         },
-        tags=['Authentication']
+        tags=["Authentication"],
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
@@ -135,7 +135,7 @@ class TokenObtainPairView(SimpleJWTTokenObtainPairView):
 
 class TokenRefreshView(SimpleJWTTokenRefreshView):
     """JWT Token Refresh - Get a new access token using refresh token."""
-    
+
     @swagger_auto_schema(
         operation_summary="Refresh JWT Access Token",
         operation_description="""
@@ -144,14 +144,14 @@ class TokenRefreshView(SimpleJWTTokenRefreshView):
         """,
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
-            required=['refresh'],
+            required=["refresh"],
             properties={
-                'refresh': openapi.Schema(
+                "refresh": openapi.Schema(
                     type=openapi.TYPE_STRING,
                     description="Valid refresh token",
-                    example="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+                    example="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
                 ),
-            }
+            },
         ),
         responses={
             200: openapi.Response(
@@ -160,19 +160,19 @@ class TokenRefreshView(SimpleJWTTokenRefreshView):
                     "application/json": {
                         "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
                     }
-                }
+                },
             ),
             401: openapi.Response(
                 description="Invalid or expired refresh token",
                 examples={
                     "application/json": {
                         "detail": "Token is invalid or expired",
-                        "code": "token_not_valid"
+                        "code": "token_not_valid",
                     }
-                }
-            )
+                },
+            ),
         },
-        tags=['Authentication']
+        tags=["Authentication"],
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
@@ -180,7 +180,7 @@ class TokenRefreshView(SimpleJWTTokenRefreshView):
 
 class TokenVerifyView(SimpleJWTTokenVerifyView):
     """JWT Token Verification - Verify if a token is valid."""
-    
+
     @swagger_auto_schema(
         operation_summary="Verify JWT Token",
         operation_description="""
@@ -189,33 +189,30 @@ class TokenVerifyView(SimpleJWTTokenVerifyView):
         """,
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
-            required=['token'],
+            required=["token"],
             properties={
-                'token': openapi.Schema(
+                "token": openapi.Schema(
                     type=openapi.TYPE_STRING,
                     description="JWT token to verify (access or refresh)",
-                    example="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+                    example="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
                 ),
-            }
+            },
         ),
         responses={
             200: openapi.Response(
-                description="Token is valid",
-                examples={
-                    "application/json": {}
-                }
+                description="Token is valid", examples={"application/json": {}}
             ),
             401: openapi.Response(
                 description="Token is invalid or expired",
                 examples={
                     "application/json": {
                         "detail": "Token is invalid or expired",
-                        "code": "token_not_valid"
+                        "code": "token_not_valid",
                     }
-                }
-            )
+                },
+            ),
         },
-        tags=['Authentication']
+        tags=["Authentication"],
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)

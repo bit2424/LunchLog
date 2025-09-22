@@ -11,12 +11,13 @@ class WebhookTokenAuthentication(TokenAuthentication):
     Token authentication specifically for webhook endpoints.
     Uses a different token model or validation logic if needed.
     """
-    keyword = 'Bearer'
+
+    keyword = "Bearer"
 
     def authenticate_credentials(self, key):
         user, token = super().authenticate_credentials(key)
-        
+
         if not user.is_active:
-            raise AuthenticationFailed('User inactive or deleted.')
-            
+            raise AuthenticationFailed("User inactive or deleted.")
+
         return user, token

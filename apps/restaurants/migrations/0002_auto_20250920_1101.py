@@ -12,107 +12,106 @@ class Migration(migrations.Migration):
     operations = [
         # Remove old indexes
         migrations.RemoveIndex(
-            model_name='restaurant',
-            name='restaurant_city_idx',
+            model_name="restaurant",
+            name="restaurant_city_idx",
         ),
         migrations.RemoveIndex(
-            model_name='restaurant',
-            name='restaurant_sync_status_idx',
+            model_name="restaurant",
+            name="restaurant_sync_status_idx",
         ),
         migrations.RemoveIndex(
-            model_name='restaurant',
-            name='restaurant_last_sync_idx',
+            model_name="restaurant",
+            name="restaurant_last_sync_idx",
         ),
-        
         # Add new cuisine field
         migrations.AddField(
-            model_name='restaurant',
-            name='cuisine',
-            field=models.CharField(blank=True, help_text='Primary cuisine type', max_length=100, null=True),
+            model_name="restaurant",
+            name="cuisine",
+            field=models.CharField(
+                blank=True, help_text="Primary cuisine type", max_length=100, null=True
+            ),
         ),
-        
         # Rename lat to latitude
         migrations.RenameField(
-            model_name='restaurant',
-            old_name='lat',
-            new_name='latitude',
+            model_name="restaurant",
+            old_name="lat",
+            new_name="latitude",
         ),
-        
         # Rename lng to longitude
         migrations.RenameField(
-            model_name='restaurant',
-            old_name='lng',
-            new_name='longitude',
+            model_name="restaurant",
+            old_name="lng",
+            new_name="longitude",
         ),
-        
         # Remove fields that are no longer needed
         migrations.RemoveField(
-            model_name='restaurant',
-            name='city',
+            model_name="restaurant",
+            name="city",
         ),
         migrations.RemoveField(
-            model_name='restaurant',
-            name='created_at',
+            model_name="restaurant",
+            name="created_at",
         ),
         migrations.RemoveField(
-            model_name='restaurant',
-            name='cuisines',
+            model_name="restaurant",
+            name="cuisines",
         ),
         migrations.RemoveField(
-            model_name='restaurant',
-            name='google_types',
+            model_name="restaurant",
+            name="google_types",
         ),
         migrations.RemoveField(
-            model_name='restaurant',
-            name='last_synced_at',
+            model_name="restaurant",
+            name="last_synced_at",
         ),
         migrations.RemoveField(
-            model_name='restaurant',
-            name='price_level',
+            model_name="restaurant",
+            name="price_level",
         ),
         migrations.RemoveField(
-            model_name='restaurant',
-            name='ratings_count',
+            model_name="restaurant",
+            name="ratings_count",
         ),
         migrations.RemoveField(
-            model_name='restaurant',
-            name='sync_status',
+            model_name="restaurant",
+            name="sync_status",
         ),
-        
         # Update field help text to match new model
         migrations.AlterField(
-            model_name='restaurant',
-            name='address',
-            field=models.TextField(help_text='Full formatted address'),
+            model_name="restaurant",
+            name="address",
+            field=models.TextField(help_text="Full formatted address"),
         ),
         migrations.AlterField(
-            model_name='restaurant',
-            name='name',
-            field=models.CharField(help_text='Restaurant name', max_length=255),
+            model_name="restaurant",
+            name="name",
+            field=models.CharField(help_text="Restaurant name", max_length=255),
         ),
         migrations.AlterField(
-            model_name='restaurant',
-            name='place_id',
-            field=models.CharField(help_text='Google Places API place_id', max_length=255, unique=True),
+            model_name="restaurant",
+            name="place_id",
+            field=models.CharField(
+                help_text="Google Places API place_id", max_length=255, unique=True
+            ),
         ),
         migrations.AlterField(
-            model_name='restaurant',
-            name='updated_at',
-            field=models.DateTimeField(auto_now=True, help_text='Last updated timestamp'),
+            model_name="restaurant",
+            name="updated_at",
+            field=models.DateTimeField(
+                auto_now=True, help_text="Last updated timestamp"
+            ),
         ),
-        
         # Add new indexes
         migrations.AddIndex(
-            model_name='restaurant',
-            index=models.Index(fields=['name'], name='restaurant_name_idx'),
+            model_name="restaurant",
+            index=models.Index(fields=["name"], name="restaurant_name_idx"),
         ),
         migrations.AddIndex(
-            model_name='restaurant',
-            index=models.Index(fields=['cuisine'], name='restaurant_cuisine_idx'),
+            model_name="restaurant",
+            index=models.Index(fields=["cuisine"], name="restaurant_cuisine_idx"),
         ),
-        
         # Delete the Cuisine model since we're not using it anymore
         migrations.DeleteModel(
-            name='Cuisine',
+            name="Cuisine",
         ),
     ]

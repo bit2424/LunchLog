@@ -7,12 +7,11 @@ from rest_framework.routers import DefaultRouter
 
 from . import views
 
-app_name = 'receipts'
+app_name = "receipts"
 
 router = DefaultRouter()
-router.register(r'', views.ReceiptViewSet, basename='receipts')
+router.register(r"", views.ReceiptViewSet, basename="receipts")
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path("", include(router.urls)),
 ]
-
