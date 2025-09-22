@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 
 from decouple import config
+import dj_database_url
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -38,6 +39,7 @@ THIRD_PARTY_APPS = [
     'corsheaders',
     'storages',
     'django_celery_beat',
+    'drf_yasg',
 ]
 
 LOCAL_APPS = [
@@ -85,26 +87,29 @@ WSGI_APPLICATION = 'lunchlog.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-if config('PROFILE', default='dev') == 'prod':
+# Prefer DATABASE_URL if provided; otherwise fall back to DB_* or POSTGRES_* variables
+DATABASE_URL = config('DATABASE_URL', default=None)
+
+if DATABASE_URL:
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': config('DB_NAME', default='lunchlog'),
-            'USER': config('DB_USER', default='lunchlog'),
-            'PASSWORD': config('DB_PASSWORD', default='lunchlog123'),
-            'HOST': config('DB_HOST', default='db_prod'),
-            'PORT': config('DB_PORT', default='5432'),
-        }
+        'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=600)
     }
 else:
+    is_prod_profile = config('PROFILE', default='dev') == 'prod'
+    DB_NAME = config('DB_NAME', default=config('POSTGRES_DB', default='lunchlog'))
+    DB_USER = config('DB_USER', default=config('POSTGRES_USER', default='lunchlog'))
+    DB_PASSWORD = config('DB_PASSWORD', default=config('POSTGRES_PASSWORD', default='lunchlog123'))
+    DB_HOST = config('DB_HOST', default=('db_prod' if is_prod_profile else 'db'))
+    DB_PORT = config('DB_PORT', default='5432')
+
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': config('DB_NAME', default='lunchlog'),
-            'USER': config('DB_USER', default='lunchlog'),
-            'PASSWORD': config('DB_PASSWORD', default='lunchlog123'),
-            'HOST': config('DB_HOST', default='db'),
-            'PORT': config('DB_PORT', default='5432'),
+            'NAME': DB_NAME,
+            'USER': DB_USER,
+            'PASSWORD': DB_PASSWORD,
+            'HOST': DB_HOST,
+            'PORT': DB_PORT,
         }
     }
 
@@ -197,6 +202,37 @@ CORS_ALLOWED_ORIGINS = config(
 )
 
 CORS_ALLOW_CREDENTIALS = True
+
+# Swagger/OpenAPI Settings
+SWAGGER_SETTINGS = {
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header'
+        },
+        'Token': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header'
+        }
+    },
+    'USE_SESSION_AUTH': True,
+    'JSON_EDITOR': True,
+    'SUPPORTED_SUBMIT_METHODS': [
+        'get',
+        'post',
+        'put',
+        'delete',
+        'patch'
+    ],
+    'OPERATIONS_SORTER': 'alpha',
+    'TAGS_SORTER': 'alpha',
+    'DOC_EXPANSION': 'none',
+    'DEEP_LINKING': True,
+    'SHOW_EXTENSIONS': True,
+    'DEFAULT_MODEL_RENDERING': 'model',
+}
 
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True
