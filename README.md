@@ -5,13 +5,13 @@ Office Lunch Receipt Management and Recommendation System - REST API Backend
 ## Table of Contents
 
 - [Overview](#overview)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
 - [Project Architecture](#project-architecture)
 - [Data Schemas](#data-schemas)
-- [Prerequisites](#prerequisites)
 - [API Endpoints](#api-endpoints)
   - [API Documentation (Swagger)](#api-documentation-swagger)
   - [Authentication](#authentication)
@@ -42,6 +42,7 @@ LunchLog is a Django REST API to manage lunch receipts and recommend restaurants
 ```
 lunchlog/
 ├── apps/                  # Django applications
+│   ├── users/             # User management
 │   ├── receipts/          # Receipt management
 │   └── restaurants/       # Restaurant database
 ├── lunchlog/              # Django project settings
@@ -49,10 +50,15 @@ lunchlog/
 │   ├── authentication.py  # Custom auth classes
 │   └── permissions.py     # Custom permissions
 ├── tests/                 # Project-wide tests
-├── fixtures/              # Initial data fixtures
 ├── docker-compose.yml     # Container configuration
 └── Makefile               # Development commands
 ```
+## Prerequisites
+- Docker and Docker Compose version 2.24.0+
+- Poetry (optional, but recommended)
+- Python 3.11+ (optional, to make local changes)
+- Install make
+
 ## Quick Start
 
 1. Initialize environment: `make env` then edit `.env`, even if you don't edit the `.env` file everything will work.
@@ -99,12 +105,9 @@ Data flow highlights:
 
 ER diagram:
 
-![ER diagram](/documentation/ER_Diagram.png)
-
-## Prerequisites
-- Docker and Docker Compose version 2.24.0+
-- Poetry (optional, but recommended)
-- Python 3.11+ (optional, to make local changes)
+<p align="center">
+  <img src="./documentation/ER_Diagram.png" height="900">
+</p>
 
 ## Running the Project (Docker-first)
 
