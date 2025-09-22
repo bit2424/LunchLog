@@ -30,6 +30,7 @@ Office Lunch Receipt Management and Recommendation System - REST API Backend
   - [Running Tests](#running-tests)
   - [Code Quality](#code-quality)
   - [Database Management](#database-management)
+- [Testing](#testing)
 - [Major Decisions](#major-decisions)
 - [Future Improvements](#future-improvements)
 
@@ -389,6 +390,62 @@ make format-check      # Check formatting
 make migrate           # Run migrations
 make makemigrations    # Create new migrations
 make reset-db          # Reset database (WARNING: destroys data)
+```
+
+## Testing
+
+This project uses pytest. We maintain fast, isolated unit tests and broader integration tests, mock external systems by default, and provide an opt-in test that can hit real external APIs when needed.
+
+We also added a code coverage report to the tests, currently the tests only pass with at least 80% coverage, which is currently achived.
+
+### Test types
+
+- Unit tests: Validate small, isolated logic (serializers, utilities, services). All I/O and externals are mocked.
+- Integration tests: Exercise end-to-end flows across Django, DRF, PostgreSQL, and Celery. Celery runs in eager mode in tests so task results are asserted immediately.
+
+### Mocking external systems
+
+External dependencies (e.g., Google Places) are mocked using `unittest.mock.patch` to keep tests deterministic and fast. We also mock Celery enqueues where appropriate.
+
+```python
+from unittest import mock
+
+with mock.patch("apps.restaurants.tasks.GooglePlacesService") as MockService:
+    svc = MockService.return_value
+    svc.find_place_from_text.return_value = {"candidates": [...]}
+    svc.fetch_restaurant_details.return_value = {"result": {...}}
+
+with mock.patch("apps.restaurants.tasks.update_restaurant_info.delay") as mock_task:
+    resp = auth_client.post("/api/v1/receipts/", data, format="multipart")
+    mock_task.assert_called_once()
+```
+
+### Live external test (opt‑in)
+
+There is a single test marked `external` that can call the real Google Places API to verify end-to-end enrichment. It is skipped unless `GOOGLE_PLACES_API_KEY` is provided.
+
+Run it explicitly (Docker):
+
+```bash
+# Start services (if not running)
+make docker-setup
+```
+
+### Selective runs
+
+```bash
+# All tests (inside Docker)
+make test
+
+# Only integration tests
+docker compose exec backend pytest -m integration -q
+
+# Run only external tests
+docker compose exec backend bash -lc \
+  'export GOOGLE_PLACES_API_KEY=your-key && pytest -m external -q'
+
+# Coverage
+make test-coverage
 ```
 
 ## Makefile Quick Reference
