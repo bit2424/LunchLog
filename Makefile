@@ -42,7 +42,7 @@ makemigrations-docker: ## Create new Django migrations in Docker
 	docker exec backend python manage.py makemigrations
 
 
-add-demo-data: ## Add demo data to the database	
+add-demo-data: ## Add demo data to the database
 	docker exec backend python manage.py seed_demo_data --fresh
 
 reset-db: ## Reset database (WARNING: destroys all data)
