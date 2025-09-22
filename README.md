@@ -99,7 +99,7 @@ Data flow highlights:
 
 ER diagram:
 
-![ER diagram](/documentation/ER_diagram.png)
+![ER diagram](/documentation/ER_Diagram.png)
 
 ## Prerequisites
 - Docker and Docker Compose version 2.24.0+
