@@ -41,6 +41,10 @@ migrate-docker: ## Run Django migrations in Docker
 makemigrations-docker: ## Create new Django migrations in Docker
 	docker exec backend python manage.py makemigrations
 
+
+add-demo-data: ## Add demo data to the database	
+	docker exec backend python manage.py seed_demo_data --fresh
+
 reset-db: ## Reset database (WARNING: destroys all data)
 	@echo "This will destroy all data. Are you sure? [y/N]"
 	@read -r response; if [ "$$response" = "y" ] || [ "$$response" = "Y" ]; then \
@@ -95,7 +99,7 @@ local-setup: install up migrate  ## Complete development setup to run locally
 	@echo "Development environment setup complete!"
 	@echo "You can now run 'make runserver' to start the development server"
 
-docker-setup: down build up migrate-docker ## Complete development setup in Docker
+docker-setup: down build up migrate-docker add-demo-data ## Complete development setup in Docker
 	
 	@echo "Development environment setup complete!"
 	@if [ "$(PROFILE)" = "prod" ]; then \
