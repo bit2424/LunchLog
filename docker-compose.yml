@@ -2,38 +2,34 @@ services:
   backend:
     profiles: 
       - dev
+      - prod
     container_name: backend
     build: 
       context: .
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile.prod
     restart: always
     volumes:
-      - .:/app  # Only mount code for development
+      - .:/app  # Only mount code for production
+      - lunchlog_logs:/var/log/lunchlog  # Mount logs directory
     ports:
       - "9000:8000"
     depends_on:
       - db
-      - redis
-    environment:
-      - DATABASE_URL=postgresql://lunchlog:lunchlog123@db:5432/lunchlog
-      - SECRET_KEY=dev-secret-key-change-in-production
-      - DEBUG=True
-      - ALLOWED_HOSTS=*
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    env_file:
+      .env
     command: >
       bash -c "python manage.py migrate &&
-               python manage.py runserver 0.0.0.0:8000"
-
+               python manage.py create_default_user &&
+               gunicorn --bind 0.0.0.0:8000 lunchlog.wsgi:application"
+  
   db:
     profiles: 
       - dev
+      - prod
     container_name: db
     image: postgres:15
-    environment:
-      POSTGRES_DB: lunchlog
-      POSTGRES_USER: lunchlog
-      POSTGRES_PASSWORD: lunchlog123
+    env_file:
+      .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -47,6 +43,7 @@ services:
   redis:
     profiles:
       - dev
+      - prod
     container_name: redis
     image: redis:7-alpine
     restart: always
@@ -63,6 +60,7 @@ services:
   celery:
     profiles:
       - dev
+      - prod
     container_name: celery
     build:
       context: .
@@ -73,17 +71,14 @@ services:
     depends_on:
       - db
       - redis
-    environment:
-      - DATABASE_URL=postgresql://lunchlog:lunchlog123@db:5432/lunchlog
-      - SECRET_KEY=dev-secret-key-change-in-production
-      - DEBUG=True
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    env_file:
+      .env
     command: celery -A lunchlog worker --loglevel=info
 
   celery-beat:
     profiles:
       - dev
+      - prod
     container_name: celery-beat
     build:
       context: .
@@ -94,51 +89,11 @@ services:
     depends_on:
       - db
       - redis
-    environment:
-      - DATABASE_URL=postgresql://lunchlog:lunchlog123@db:5432/lunchlog
-      - SECRET_KEY=dev-secret-key-change-in-production
-      - DEBUG=True
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    env_file:
+      .env
     command: celery -A lunchlog beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
-
-  db_prod:
-    profiles: 
-      - prod
-    container_name: db_prod
-    image: postgres:15
-    env_file:
-      - .env
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lunchlog"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    ports:
-      - "5432:5432"
   
-  backend_prod:
-    profiles: 
-      - prod
-    container_name: backend_prod
-    build: 
-      context: .
-      dockerfile: Dockerfile.prod
-    restart: always
-    volumes:
-      - .:/app  # Only mount code for production
-      - lunchlog_logs:/var/log/lunchlog  # Mount logs directory
-
-    depends_on:
-      - db_prod
-    env_file:
-      - .env
-    command: >
-      bash -c "python manage.py migrate &&
-               python manage.py create_default_user &&
-               gunicorn --bind 0.0.0.0:8000 lunchlog.wsgi:application"
+  
 
   proxy:
     profiles:
@@ -156,7 +111,7 @@ services:
       - ./staticfiles:/app/staticfiles:ro
       - ./media:/app/media:ro
     depends_on:
-      - backend_prod
+      - backend
     networks:
       - default
 
