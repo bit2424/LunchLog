@@ -42,3 +42,10 @@ CORS_ALLOW_ALL_ORIGINS = True
 # Test-specific settings
 DEBUG = False
 SECRET_KEY = 'test-secret-key-not-for-production'
+
+# Ensure no HTTPS redirects or secure-only cookies during tests
+SECURE_SSL_REDIRECT = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+SECURE_HSTS_SECONDS = 0
+SECURE_PROXY_SSL_HEADER = None
