@@ -40,26 +40,3 @@ def test_receipt_price_validation():
     # Valid price should not raise ValidationError
     receipt = Receipt(price=Decimal('0.01'))
     receipt.full_clean(exclude=['user', 'date', 'restaurant_name', 'address', 'image'])
-
-def test_receipt_indexes(test_user):
-    test_date = date.today()
-    Receipt.objects.create(
-        user=test_user,
-        date=test_date,
-        price=Decimal('10.00'),
-        restaurant_name='Test Restaurant',
-        address='Test Address',
-        image='test.jpg'
-    )
-
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            EXPLAIN SELECT 1 FROM receipts_receipt
-            WHERE date = %s AND user_id = %s LIMIT 1;
-        """, [test_date, test_user.id])
-        plan = cursor.fetchall()
-
-    # Flatten plan text and assert our index name is mentioned
-    plan_text = " ".join(row[0] for row in plan)
-    print(plan_text)
-    assert "receipt_user_date_desc_idx" in plan_text

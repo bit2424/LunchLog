@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token
 
-from .models import Restaurant, Cuisine
+from apps.restaurants.models import Restaurant, Cuisine
 
 User = get_user_model()
 
