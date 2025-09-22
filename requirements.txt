@@ -15,6 +15,7 @@ redis>=5.0.0
 googlemaps>=4.10.0
 django-celery-beat>=2.5.0
 drf_yasg>=1.21.7
+whitenoise>=6.5.0
 
 # Development dependencies
 django-extensions>=3.2.0

@@ -35,6 +35,19 @@ DATABASES = {
 # Less restrictive CORS in development
 CORS_ALLOW_ALL_ORIGINS = True
 
+# Default user for development
+DEFAULT_USER_EMAIL = "basic@example.com"
+
+# Force local static/media storage in development (avoid S3 for static)
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
 # Django Debug Toolbar (uncomment to enable)
 # INSTALLED_APPS += ['debug_toolbar']
 # MIDDLEWARE = ['debug_toolbar.middleware.DebugToolbarMiddleware'] + MIDDLEWARE
