@@ -321,8 +321,7 @@ class TestGooglePlacesServiceExtensions:
             ]
         }
         mock_client_class.return_value = mock_client
-        
-        service = GooglePlacesService()
+        service = GooglePlacesService(client=mock_client)
         
         # Test filtering by rating
         results = service.search_nearby_restaurants(
@@ -366,7 +365,7 @@ class TestGooglePlacesServiceExtensions:
         }
         mock_client_class.return_value = mock_client
         
-        service = GooglePlacesService()
+        service = GooglePlacesService(client=mock_client)
         
         # Test 'good' recommendations
         results = service.get_recommendations_near_location(

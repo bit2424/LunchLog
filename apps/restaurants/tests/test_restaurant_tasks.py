@@ -211,7 +211,7 @@ class GooglePlacesServiceTest(TestCase):
         mock_client_class.return_value = mock_client
         
         # Create service with mocked client
-        service = GooglePlacesService()
+        service = GooglePlacesService(client=mock_client)
         
         # Fetch details
         result = service.fetch_restaurant_details('ChIJN1t_tDeuEmsRUsoyG83frY4')
