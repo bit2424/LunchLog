@@ -47,11 +47,7 @@ class Command(BaseCommand):
     def _get_or_create_demo_user(self):
         User = get_user_model()
         user, created = User.objects.get_or_create(
-            email="basic@example.com",
-            defaults={
-                "first_name": "Basic",
-                "last_name": "User",
-            },
+            email="basic@example.com"
         )
         if created:
             user.set_password("basic123")
