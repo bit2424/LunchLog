@@ -31,6 +31,7 @@ Office Lunch Receipt Management and Recommendation System - REST API Backend
   - [Code Quality](#code-quality)
   - [Database Management](#database-management)
 - [Testing](#testing)
+- [Celery and Background Jobs](#celery-and-background-jobs)
 - [Major Decisions](#major-decisions)
 - [Future Improvements](#future-improvements)
 
@@ -447,6 +448,92 @@ docker compose exec backend bash -lc \
 # Coverage
 make test-coverage
 ```
+
+## Celery and Background Jobs
+
+Celery powers asynchronous and scheduled work for the API (e.g., enriching restaurant data from Google Places). The project runs a dedicated worker and a beat scheduler alongside the API and Redis.
+
+### Components
+
+- Worker: `celery -A lunchlog worker --loglevel=info` (service `celery`)
+- Beat: `celery -A lunchlog beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler` (service `celery-beat`)
+- Broker & result backend: Redis (see `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`)
+- App config: `lunchlog/celery.py` with `app.autodiscover_tasks()`
+
+### Source files and configuration
+
+- Celery app: `lunchlog/celery.py`
+- Celery settings: `lunchlog/settings/base.py` (prefixed with `CELERY_`)
+- Tasks: `apps/restaurants/tasks.py`
+- Periodic schedule seeding: `apps/restaurants/management/commands/setup_periodic_tasks.py`
+- Services and commands: `docker-compose.yml` (services `celery` and `celery-beat`)
+
+### Key tasks
+
+- `apps.restaurants.tasks.update_restaurant_info(restaurant_id)`: Fetches details from Google Places for a given `Restaurant`, handles stub `place_id` resolution, updates fields atomically, and retries on failure with exponential backoff (`max_retries=3`). Returns a structured result payload on success/error.
+- `apps.restaurants.tasks.update_all_restaurants()`: Bulk queues `update_restaurant_info` for every restaurant. Intended for periodic execution via beat.
+
+### Scheduling (django-celery-beat)
+
+We use the database scheduler. A management command seeds a periodic job:
+
+```startLine:endLine:apps/restaurants/management/commands/setup_periodic_tasks.py
+from django_celery_beat.models import PeriodicTask, CrontabSchedule
+...
+task, created = PeriodicTask.objects.get_or_create(
+    name="Update all restaurants",
+    defaults={
+        "crontab": schedule,
+        "task": "apps.restaurants.tasks.update_all_restaurants",
+        ...,
+    },
+)
+```
+
+Apply or update schedules:
+
+```bash
+docker compose exec backend python manage.py migrate  # ensures beat tables
+docker compose exec backend python manage.py setup_periodic_tasks
+```
+
+### Local development
+
+Start everything:
+
+```bash
+make docker-setup
+```
+
+Tail worker and beat logs:
+
+```bash
+docker compose logs -f celery
+docker compose logs -f celery-beat
+```
+
+Trigger tasks manually:
+
+```bash
+# Update one restaurant
+docker compose exec backend python - <<'PY'
+from apps.restaurants.tasks import update_restaurant_info
+print(update_restaurant_info.delay("<restaurant-uuid>").id)
+PY
+
+# Queue bulk update
+docker compose exec backend python - <<'PY'
+from apps.restaurants.tasks import update_all_restaurants
+print(update_all_restaurants.delay().id)
+PY
+```
+
+### Why Celery?
+
+- Reduce API latency: Offload slow, I/O-heavy work (third-party API calls, enrichment) from request/response paths, returning responses faster to users.
+- Improve reliability: Built-in retries/backoff for transient failures instead of failing user requests.
+- Smooth load on the API: Background queue absorbs spikes, keeping `backend` responsive and resource usage stable.
+- Scale independently: Worker processes can be scaled horizontally without scaling the API.
 
 ## Makefile Quick Reference
 
