@@ -81,7 +81,7 @@ lunchlog/
 
 Infrastructure Diagram:
 
-![Infrastructure Diagram](./documentation/Infra_Diagram.png)
+![Infrastructure Diagram](/documentation/Infra_Diagram.png)
 
 - **Apps**: `users`, `receipts`, `restaurants`
 - **API**: Django REST Framework routers under `/api/v1/`
@@ -99,7 +99,7 @@ Data flow highlights:
 
 ER diagram:
 
-![ER diagram](./documentation/ER_diagram.png)
+![ER diagram](/documentation/ER_diagram.png)
 
 ## Prerequisites
 - Docker and Docker Compose version 2.24.0+
