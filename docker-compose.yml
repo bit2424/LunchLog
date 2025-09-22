@@ -17,6 +17,9 @@ services:
       - db
     env_file:
       .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-lunchlog.settings.development}
+      - PROFILE=${PROFILE:-dev}
     command: >
       bash -c "python manage.py migrate &&
                python manage.py create_default_user &&
