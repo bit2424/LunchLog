@@ -19,6 +19,11 @@ up: ## Start all containers with specified profile (dev or prod)
 
 	docker compose --profile $(PROFILE) up -d
 	@echo "Containers started with profile: $(PROFILE)"
+
+db-up: ## Start only the database container
+	docker compose --profile $(PROFILE) up -d db
+	@echo "Waiting for database to be ready..."
+	@timeout 30 bash -c 'until docker compose exec -T db pg_isready -U lunchlog; do sleep 1; done' || echo "Database might not be ready yet";
 	
 down: ## Stop and remove containers
 	docker compose --profile prod down; docker compose --profile dev down;

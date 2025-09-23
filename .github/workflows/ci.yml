@@ -24,7 +24,8 @@ jobs:
 
       - name: Start only essential services for testing
         run: |
-          docker compose --profile dev up -d db redis backend
+          make db-up PROFILE=dev
+          make up PROFILE=dev
 
       - name: Run migrations and seed data
         run: |
