@@ -190,7 +190,7 @@ All endpoints are prefixed with `/api/v1/` for the following reasons:
 
 - **Backward Compatibility**: Version prefix allows us to evolve the API without breaking existing clients. New fields or endpoint changes can be introduced in a new version while maintaining v1 contracts.
 
-- **Parallel Versions**: We can run multiple versions simultaneously (e.g., `/api/v1/` and `/api/v2/`), enabling gradual client migrations and smooth transitions.
+- **Parallel Versions**: It can run multiple versions simultaneously (e.g., `/api/v1/` and `/api/v2/`), enabling gradual client migrations and smooth transitions.
 
 - **Clear Contracts**: Each version has its own OpenAPI/Swagger documentation, test suite, and validation rules, making it clear what clients can expect.
 
@@ -314,10 +314,20 @@ curl -X POST http://localhost:9000/api/v1/restaurants/ \
 
 ### Recommendation System
 
-- `GET /api/v1/restaurants/recommendations/good/` - High-quality restaurant recommendations
+- `GET /api/v1/restaurants/recommendations/good/` - Highly rated restaurant recommendations
 - `GET /api/v1/restaurants/recommendations/cheap/` - Budget-friendly restaurant recommendations  
 - `GET /api/v1/restaurants/recommendations/cuisine-match/` - Restaurants matching user's preferred cuisines
 - `GET /api/v1/restaurants/recommendations/all/` - All recommendation types in a single response
+
+#### Why Separate Endpoints?
+
+Instead of using a single endpoint with a `type` parameter, separate endpoints are used for these reasons:
+
+- **Flexible Parameters**: Different endpoints can have type-specific parameters without cluttering a single endpoint. For example, `cuisine-match` might need cuisine filtering while `cheap` focuses on price ranges.
+
+- **Independent Caching**: Each endpoint can have its own cache TTL and invalidation rules. High-quality recommendations might cache longer than real-time price-based ones.
+
+- **Permission Granularity**: Future access control can be applied per recommendation type, premium users can get different types of recommendations.
 
 #### Query Parameters
 
@@ -409,9 +419,9 @@ make reset-db          # Reset database (WARNING: destroys data)
 
 ## Testing
 
-This project uses pytest. We maintain fast, isolated unit tests and broader integration tests, mock external systems by default, and provide an opt-in test that can hit real external APIs when needed.
+This project uses pytest. To enable fast, isolated unit tests and broader integration tests, mock external systems by default, and provide an opt-in test that can hit real external APIs when needed.
 
-We also added a code coverage report to the tests, currently the tests only pass with at least 80% coverage, which is currently achived.
+A code coverage report is included in the tests, currently the tests only pass with at least 80% coverage, which is currently achieved.
 
 ### Test types
 
@@ -420,7 +430,7 @@ We also added a code coverage report to the tests, currently the tests only pass
 
 ### Mocking external systems
 
-External dependencies (e.g., Google Places) are mocked using `unittest.mock.patch` to keep tests deterministic and fast. We also mock Celery enqueues where appropriate.
+External dependencies (e.g., Google Places) are mocked to keep tests deterministic and fast. Celery enqueues are also mocked where necessary.
 
 ```python
 from unittest import mock
@@ -437,7 +447,7 @@ with mock.patch("apps.restaurants.tasks.update_restaurant_info.delay") as mock_t
 
 ### Live external test (opt‑in)
 
-There is a single test marked `external` that can call the real Google Places API to verify end-to-end enrichment. It is skipped unless `GOOGLE_PLACES_API_KEY` is provided.
+There is a single test marked `external` that can call the real Google Places API to verify end-to-end enrichment. It is skipped unless `GOOGLE_PLACES_API_KEY` is provided in the environment variables.
 
 Run it explicitly (Docker):
 
@@ -489,7 +499,7 @@ Celery powers asynchronous and scheduled work for the API (e.g., enriching resta
 
 ### Scheduling (django-celery-beat)
 
-We use the database scheduler. A management command seeds a periodic job:
+A database scheduler is used and a management command seeds a periodic job:
 
 ```startLine:endLine:apps/restaurants/management/commands/setup_periodic_tasks.py
 from django_celery_beat.models import PeriodicTask, CrontabSchedule
@@ -560,45 +570,6 @@ make logs                   # Tail logs
 make test                   # Run pytest in container
 make down                   # Stop all containers (dev/prod)
 ```
-
-## Environment Variables
-
-Copy `env.example` to `.env` and configure as needed:
-
-```env
-# Database (Django defaults exist; override if needed)
-DB_NAME=lunchlog
-DB_USER=lunchlog
-DB_PASSWORD=lunchlog123
-DB_HOST=db
-DB_PORT=5432
-
-# Django
-SECRET_KEY=your-secret-key-here
-DEBUG=True
-ALLOWED_HOSTS=localhost,127.0.0.1
-
-# CORS
-CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-
-# AWS S3 (optional; required for production media on S3)
-AWS_ACCESS_KEY_ID=your-access-key-id
-AWS_SECRET_ACCESS_KEY=your-secret-access-key
-AWS_STORAGE_BUCKET_NAME=your-bucket-name
-AWS_S3_REGION_NAME=us-east-1
-AWS_S3_SIGNATURE_VERSION=s3v4
-
-# Celery / Redis
-CELERY_BROKER_URL=redis://redis:6379/0
-CELERY_RESULT_BACKEND=redis://redis:6379/0
-
-# Google Places (optional)
-GOOGLE_PLACES_API_KEY=your-google-places-api-key
-```
-
-Notes:
-- If `AWS_STORAGE_BUCKET_NAME` is set, uploaded receipt images are stored in S3.
-- Redis is required for Celery jobs; started automatically via Docker Compose.
 
 ## Major Decisions
 
