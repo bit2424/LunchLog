@@ -21,9 +21,7 @@ services:
       - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-lunchlog.settings.development}
       - PROFILE=${PROFILE:-dev}
     command: >
-      bash -c "python manage.py migrate &&
-               python manage.py create_default_user &&
-               gunicorn --bind 0.0.0.0:8000 lunchlog.wsgi:application"
+      bash -c "gunicorn --bind 0.0.0.0:8000 lunchlog.wsgi:application"
   
   db:
     profiles: 
