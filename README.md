@@ -184,9 +184,23 @@ make format         # Format code
 
 ## API Endpoints
 
+### API Versioning Strategy
+
+All endpoints are prefixed with `/api/v1/` for the following reasons:
+
+- **Backward Compatibility**: Version prefix allows us to evolve the API without breaking existing clients. New fields or endpoint changes can be introduced in a new version while maintaining v1 contracts.
+
+- **Parallel Versions**: We can run multiple versions simultaneously (e.g., `/api/v1/` and `/api/v2/`), enabling gradual client migrations and smooth transitions.
+
+- **Clear Contracts**: Each version has its own OpenAPI/Swagger documentation, test suite, and validation rules, making it clear what clients can expect.
+
+- **Safe Deprecation**: Older versions can be deprecated on a clear timeline while keeping newer versions active, giving clients time to migrate.
+
 ### API Documentation (Swagger)
 
 Interactive API documentation is available via Swagger UI and ReDoc:
+
+![Swagger UI](/documentation/Swagger_UI.png)
 
 - **Swagger UI**: `http://localhost:9000/swagger/` (development) or `https://localhost/swagger/` (production)
 
@@ -247,11 +261,11 @@ Examples:
 ```bash
 # List (Token auth)
 curl -X GET http://localhost:9000/api/v1/receipts/ \
-  -H "Authorization: Token YOUR_TOKEN"
+  -H "Authorization: Bearer $ACCESS"
 
 # Create (multipart). Provide restaurant_id OR restaurant_name + address
 curl -X POST http://localhost:9000/api/v1/receipts/ \
-  -H "Authorization: Token YOUR_TOKEN" \
+  -H "Authorization: Bearer $ACCESS" \
   -F "date=2025-09-19" \
   -F "price=12.50" \
   -F "restaurant_id=2c3c5fbc-2a5a-4b7f-8d52-6a3e9b5c9b02" \
@@ -259,7 +273,7 @@ curl -X POST http://localhost:9000/api/v1/receipts/ \
 
 # OR name/address instead of restaurant_id
 curl -X POST http://localhost:9000/api/v1/receipts/ \
-  -H "Authorization: Token YOUR_TOKEN" \
+  -H "Authorization: Bearer $ACCESS" \
   -F "date=2025-09-19" \
   -F "price=12.50" \
   -F "restaurant_name=Pasta Place" \
