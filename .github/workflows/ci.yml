@@ -40,18 +40,6 @@ jobs:
             --cov-report=term-missing \
             --cov-fail-under=80
 
-      - name: Copy coverage report from container
-        run: |
-          docker compose cp backend:/app/htmlcov ./htmlcov
-
-      - name: Upload coverage HTML report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-html
-          path: htmlcov
-          if-no-files-found: warn
-
       - name: Clean up containers
         if: always()
         run: |
