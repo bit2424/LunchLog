@@ -30,7 +30,7 @@ from rest_framework.authtoken.models import Token
 from django.shortcuts import render
 from django.conf import settings
 from django.template.response import TemplateResponse
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from rest_framework.response import Response as DRFResponse
 
 
@@ -193,8 +193,18 @@ window.addEventListener('load', function() {{
     return response
 
 
+def health_check(request):
+    """Simple health check endpoint for ECS health checks."""
+    return JsonResponse({
+        "status": "healthy",
+        "service": "lunchlog-backend"
+    })
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # Health check endpoint
+    path("health/", health_check, name="health_check"),
     # API Documentation
     re_path(
         r"^swagger(?P<format>\.json|\.yaml)$",
