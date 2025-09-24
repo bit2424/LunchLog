@@ -35,16 +35,23 @@ export $(cat .env | xargs)
 If you need additional env vars, either parameterize the template or create Secrets in Secrets Manager and add to the ECS task definitions.
 
 ### Secrets and environment variables
-- The stack automatically creates and wires these secrets:
-  - `SECRET_KEY`: `lunchlog-prod-django-secretkey` (generated)
-  - `DATABASE_URL`: `lunchlog-prod-app-databaseurl` (built from the RDS endpoint)
-  - `REDIS_URL`: `lunchlog-prod-app-redisurl` (built from the ElastiCache endpoint)
-  - RDS master password: `lunchlog-prod-rds-master-password` (internal; used to construct `DATABASE_URL`)
+- The stack automatically creates and wires these secrets (auto-generated unique names):
+  - `SECRET_KEY`: Django secret key (generated)
+  - `DATABASE_URL`: PostgreSQL connection string (built from RDS endpoint)
+  - `REDIS_URL`: Redis connection string (built from ElastiCache endpoint)
+  - RDS master password: Internal secret used to construct DATABASE_URL
 
-- View a secret value (example):
+- List secrets created by the stack:
+```bash
+aws secretsmanager list-secrets --region $AWS_REGION \
+  --query "SecretList[?contains(Description, 'Django') || contains(Description, 'DATABASE_URL') || contains(Description, 'Redis')].[Name,Description]" \
+  --output table
+```
+
+- View a secret value (get the name from list above):
 ```bash
 aws secretsmanager get-secret-value \
-  --secret-id lunchlog-prod-app-databaseurl \
+  --secret-id SECRET_NAME_FROM_LIST \
   --region $AWS_REGION \
   --query SecretString --output text | cat
 ```

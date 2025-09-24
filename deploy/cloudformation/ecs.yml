@@ -375,7 +375,6 @@ Resources:
   AppSecretKey:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Name: !Sub '${ProjectName}-${EnvironmentName}-django-secretkey'
       Description: Django SECRET_KEY
       GenerateSecretString:
         PasswordLength: 64
@@ -384,7 +383,6 @@ Resources:
   DBMasterPassword:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Name: !Sub '${ProjectName}-${EnvironmentName}-rds-master-password'
       Description: RDS master user password
       GenerateSecretString:
         PasswordLength: 32
@@ -402,6 +400,8 @@ Resources:
 
   DBInstance:
     Type: AWS::RDS::DBInstance
+    DependsOn:
+      - DBMasterPassword
     Properties:
       DBInstanceIdentifier: !Sub '${ProjectName}-${EnvironmentName}-postgres'
       DBName: !Ref DBName
@@ -450,21 +450,23 @@ Resources:
   DatabaseUrl:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Name: !Sub '${ProjectName}-${EnvironmentName}-app-databaseurl'
       Description: SQLAlchemy/Django DATABASE_URL for the app
       SecretString: !Sub
         - 'postgresql://${DBUser}:${DBPass}@${DBHost}:5432/${DBName}'
         - DBUser: !Ref DBUsername
-          DBPass: '{{resolve:secretsmanager:${DBMasterPassword}:SecretString}}'
+          DBPass:
+            Fn::Sub:
+              - '{{resolve:secretsmanager:${DBMasterPasswordArn}:SecretString}}'
+              - { DBMasterPasswordArn: { Ref: DBMasterPassword } }
           DBHost: !GetAtt DBInstance.Endpoint.Address
           DBName: !Ref DBName
     DependsOn:
       - DBInstance
+      - DBMasterPassword
 
   RedisUrl:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Name: !Sub '${ProjectName}-${EnvironmentName}-app-redisurl'
       Description: Redis URL for Celery broker/result
       SecretString: !Sub
         - 'redis://${RedisHost}:6379/0'
