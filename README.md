@@ -30,6 +30,7 @@ Office Lunch Receipt Management and Recommendation System - REST API Backend
   - [Running Tests](#running-tests)
   - [Code Quality](#code-quality)
   - [Database Management](#database-management)
+- [Deployment](#deployment)
 - [Testing](#testing)
 - [Celery and Background Jobs](#celery-and-background-jobs)
 - [Major Decisions](#major-decisions)
@@ -51,6 +52,9 @@ lunchlog/
 │   ├── settings/          # Environment-specific settings
 │   ├── authentication.py  # Custom auth classes
 │   └── permissions.py     # Custom permissions
+├── documentation/         # Documentation and diagrams
+├── deploy/                # Deployment configuration
+│   ├── cloudformation/    # AWS CloudFormation templates
 ├── tests/                 # Project-wide tests
 ├── docker-compose.yml     # Container configuration
 └── Makefile               # Development commands
@@ -98,6 +102,23 @@ Infrastructure Diagram:
 - **Database**: PostgreSQL
 - **Storage**: Local filesystem in dev; AWS S3 (via `django-storages`) if S3 env vars are set
 - **External API**: Google Places for restaurant enrichment (optional)
+
+Deployment Diagram:
+
+![Deployment Diagram](/documentation/Deploy_Diagram.png)
+
+### Service mapping (Compose -> ECS/CFN)
+
+| docker-compose service | Deployed resource in AWS |
+| --- | --- |
+| `backend` | ECS Fargate Service `lunchlog-prod-backend` (public IP on port 8000) |
+| `celery` | ECS Fargate Service `lunchlog-prod-celery` |
+| `celery-beat` | ECS Fargate Service `lunchlog-prod-celery-beat` |
+| `db` | RDS PostgreSQL `DBInstance` (private subnets) |
+| `redis` | ElastiCache Redis `ReplicationGroup` (private subnets) |
+| `proxy` | Not deployed (no ALB/nginx in this stack) |
+| `staticfiles`/`media` volumes | S3 buckets (Static public-read, Media private) |
+| `lunchlog_logs` volume | CloudWatch Logs log groups under `/ecs/lunchlog/prod/*` |
 
 Data flow highlights:
 - Receipt uploads store images under a user/date-based path. If S3 is configured, files go to your bucket.
@@ -416,6 +437,10 @@ make migrate           # Run migrations
 make makemigrations    # Create new migrations
 make reset-db          # Reset database (WARNING: destroys data)
 ```
+
+## Deployment
+
+The documentation for deployment is available [here](README_DEPLOY_AWS.md).
 
 ## Testing
 
