@@ -488,7 +488,7 @@ Resources:
       ContainerDefinitions:
         - Name: backend
           Image: !Ref AppImageUri
-          Command: ["bash","-c","gunicorn --bind 0.0.0.0:${ContainerPort} lunchlog.wsgi:application"]
+          Command: ["bash","-c","gunicorn --bind 0.0.0.0:8000 lunchlog.wsgi:application"]
           PortMappings:
             - ContainerPort: !Ref ContainerPort
               Protocol: tcp
