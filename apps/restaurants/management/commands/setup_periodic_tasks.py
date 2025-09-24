@@ -10,7 +10,7 @@ class Command(BaseCommand):
         # Create crontab schedule for every 2 days at 2 AM UTC
         schedule, created = CrontabSchedule.objects.get_or_create(
             minute=0,
-            hour=2,
+            hour=0,
             day_of_week="*",
             day_of_month="*/2",  # Every 2 days
             month_of_year="*",
