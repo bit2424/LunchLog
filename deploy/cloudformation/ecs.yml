@@ -1,0 +1,653 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'LunchLog: ECS Fargate (backend, celery, celery-beat), RDS Postgres, ElastiCache Redis, S3 for static/media, Secrets Manager.'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: lunchlog
+    Description: Project name used for resource naming
+  EnvironmentName:
+    Type: String
+    Default: prod
+    Description: Environment (e.g., dev, prod)
+  AppImageUri:
+    Type: String
+    Description: ECR image URI (same image used by backend, celery, celery-beat)
+  ContainerPort:
+    Type: Number
+    Default: 8000
+    Description: Container port exposed by the backend (gunicorn)
+  DesiredCountBackend:
+    Type: Number
+    Default: 1
+    Description: Number of backend tasks
+  DesiredCountCelery:
+    Type: Number
+    Default: 1
+    Description: Number of celery worker tasks
+  DesiredCountCeleryBeat:
+    Type: Number
+    Default: 1
+    Description: Number of celery-beat tasks
+  DjangoSettingsModule:
+    Type: String
+    Default: lunchlog.settings.production
+    Description: Django settings module
+  AllowedHosts:
+    Type: String
+    Default: '*'
+    Description: Comma-separated allowed hosts for Django
+  DBName:
+    Type: String
+    Default: lunchlog
+    Description: RDS database name
+  DBUsername:
+    Type: String
+    Default: lunchlog
+    Description: RDS master username
+  DBInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+    AllowedPattern: '^db\.[a-z0-9]+\.[a-z0-9]+$|^db\.[a-z0-9]+$'
+    Description: RDS instance class
+  DBAllocatedStorage:
+    Type: Number
+    Default: 20
+    MinValue: 20
+    Description: RDS allocated storage (GiB)
+  DBEngineVersion:
+    Type: String
+    Default: ''
+    Description: Optional specific PostgreSQL engine version (e.g., 15.6). Leave blank for AWS default
+  RedisNodeType:
+    Type: String
+    Default: cache.t4g.micro
+    Description: ElastiCache node type
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: CIDR for the VPC
+  PublicSubnet1Cidr:
+    Type: String
+    Default: 10.0.1.0/24
+  PublicSubnet2Cidr:
+    Type: String
+    Default: 10.0.2.0/24
+  PrivateSubnet1Cidr:
+    Type: String
+    Default: 10.0.11.0/24
+  PrivateSubnet2Cidr:
+    Type: String
+    Default: 10.0.12.0/24
+
+Mappings:
+  LogRetentionDays:
+    default:
+      days: 14
+
+Conditions:
+  HasDBEngineVersion: !Not [!Equals [!Ref DBEngineVersion, ""]]
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${EnvironmentName}-vpc'
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${EnvironmentName}-igw'
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnet1Cidr
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${EnvironmentName}-public-a'
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnet2Cidr
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${EnvironmentName}-public-b'
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet1Cidr
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${EnvironmentName}-private-a'
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet2Cidr
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${EnvironmentName}-private-b'
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${EnvironmentName}-public-rt'
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  # Security Groups
+  AppServiceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP access to backend and egress to DB/Redis/S3
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref ContainerPort
+          ToPort: !Ref ContainerPort
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${EnvironmentName}-app-sg'
+
+  RDSSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow Postgres from app tasks
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref AppServiceSG
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${EnvironmentName}-rds-sg'
+
+  RedisSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow Redis from app tasks
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          SourceSecurityGroupId: !Ref AppServiceSG
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${EnvironmentName}-redis-sg'
+
+  # S3 Buckets
+  StaticBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectName}-${EnvironmentName}-static-${AWS::AccountId}-${AWS::Region}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${EnvironmentName}-static'
+
+  StaticBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref StaticBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Sub '${StaticBucket.Arn}/*'
+
+  MediaBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectName}-${EnvironmentName}-media-${AWS::AccountId}-${AWS::Region}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${EnvironmentName}-media'
+
+  # ECS cluster
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub '${ProjectName}-${EnvironmentName}-cluster'
+
+  # CloudWatch Logs
+  BackendLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/${ProjectName}/${EnvironmentName}/backend'
+      RetentionInDays: !FindInMap [LogRetentionDays, default, days]
+
+  CeleryLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/${ProjectName}/${EnvironmentName}/celery'
+      RetentionInDays: !FindInMap [LogRetentionDays, default, days]
+
+  CeleryBeatLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/${ProjectName}/${EnvironmentName}/celery-beat'
+      RetentionInDays: !FindInMap [LogRetentionDays, default, days]
+
+  # IAM Roles
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Path: '/'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: AllowCWLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+        - PolicyName: AllowSecretsRetrieval
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref AppSecretKey
+                  - !Ref DatabaseUrl
+                  - !Ref RedisUrl
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Path: '/'
+      Policies:
+        - PolicyName: AppAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt StaticBucket.Arn
+                  - !Sub '${StaticBucket.Arn}/*'
+                  - !GetAtt MediaBucket.Arn
+                  - !Sub '${MediaBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref AppSecretKey
+                  - !Ref DatabaseUrl
+                  - !Ref RedisUrl
+
+  # Secrets
+  AppSecretKey:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${ProjectName}-${EnvironmentName}-django-secretkey'
+      Description: Django SECRET_KEY
+      GenerateSecretString:
+        PasswordLength: 64
+        ExcludePunctuation: true
+
+  DBMasterPassword:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${ProjectName}-${EnvironmentName}-rds-master-password'
+      Description: RDS master user password
+      GenerateSecretString:
+        PasswordLength: 32
+        ExcludePunctuation: true
+
+  # RDS
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnets for RDS
+      DBSubnetGroupName: !Sub '${ProjectName}-${EnvironmentName}-db-subnets'
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub '${ProjectName}-${EnvironmentName}-postgres'
+      DBName: !Ref DBName
+      Engine: postgres
+      EngineVersion: !If [HasDBEngineVersion, !Ref DBEngineVersion, !Ref 'AWS::NoValue']
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DBMasterPassword}:SecretString}}'
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: !Ref DBAllocatedStorage
+      PubliclyAccessible: false
+      VPCSecurityGroups:
+        - !Ref RDSSG
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      StorageType: gp3
+      DeletionProtection: false
+      MultiAZ: false
+
+  # ElastiCache Redis
+  CacheSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: Subnets for ElastiCache Redis
+      CacheSubnetGroupName: !Sub '${ProjectName}-${EnvironmentName}-cache-subnets'
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+
+  RedisReplicationGroup:
+    Type: AWS::ElastiCache::ReplicationGroup
+    Properties:
+      ReplicationGroupDescription: !Sub '${ProjectName}-${EnvironmentName} Redis'
+      Engine: redis
+      EngineVersion: '7.0'
+      CacheNodeType: !Ref RedisNodeType
+      NumNodeGroups: 1
+      ReplicasPerNodeGroup: 0
+      AutomaticFailoverEnabled: false
+      MultiAZEnabled: false
+      TransitEncryptionEnabled: false
+      AtRestEncryptionEnabled: true
+      CacheSubnetGroupName: !Ref CacheSubnetGroup
+      SecurityGroupIds:
+        - !Ref RedisSG
+
+  # Now that DB and Redis exist, create secrets that depend on their endpoints
+  DatabaseUrl:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${ProjectName}-${EnvironmentName}-app-databaseurl'
+      Description: SQLAlchemy/Django DATABASE_URL for the app
+      SecretString: !Sub
+        - 'postgresql://${DBUser}:${DBPass}@${DBHost}:5432/${DBName}'
+        - DBUser: !Ref DBUsername
+          DBPass: '{{resolve:secretsmanager:${DBMasterPassword}:SecretString}}'
+          DBHost: !GetAtt DBInstance.Endpoint.Address
+          DBName: !Ref DBName
+    DependsOn:
+      - DBInstance
+
+  RedisUrl:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${ProjectName}-${EnvironmentName}-app-redisurl'
+      Description: Redis URL for Celery broker/result
+      SecretString: !Sub
+        - 'redis://${RedisHost}:6379/0'
+        - RedisHost: !GetAtt RedisReplicationGroup.PrimaryEndPoint.Address
+    DependsOn:
+      - RedisReplicationGroup
+  
+  # ECS Task Definitions
+  BackendTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub '${ProjectName}-${EnvironmentName}-backend'
+      RequiresCompatibilities: [FARGATE]
+      Cpu: '512'
+      Memory: '1024'
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: backend
+          Image: !Ref AppImageUri
+          Command: ["bash","-c","gunicorn --bind 0.0.0.0:${ContainerPort} lunchlog.wsgi:application"]
+          PortMappings:
+            - ContainerPort: !Ref ContainerPort
+              Protocol: tcp
+          Environment:
+            - Name: DJANGO_SETTINGS_MODULE
+              Value: !Ref DjangoSettingsModule
+            - Name: ALLOWED_HOSTS
+              Value: !Ref AllowedHosts
+            - Name: AWS_S3_REGION_NAME
+              Value: !Ref 'AWS::Region'
+            - Name: AWS_STORAGE_STATIC_BUCKET_NAME
+              Value: !Ref StaticBucket
+            - Name: AWS_STORAGE_MEDIA_BUCKET_NAME
+              Value: !Ref MediaBucket
+          Secrets:
+            - Name: SECRET_KEY
+              ValueFrom: !Ref AppSecretKey
+            - Name: DATABASE_URL
+              ValueFrom: !Ref DatabaseUrl
+            - Name: CELERY_BROKER_URL
+              ValueFrom: !Ref RedisUrl
+            - Name: CELERY_RESULT_BACKEND
+              ValueFrom: !Ref RedisUrl
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref BackendLogGroup
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: ecs
+
+  CeleryTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub '${ProjectName}-${EnvironmentName}-celery'
+      RequiresCompatibilities: [FARGATE]
+      Cpu: '512'
+      Memory: '1024'
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: celery
+          Image: !Ref AppImageUri
+          Command: ["bash","-c","celery -A lunchlog worker --loglevel=info"]
+          Secrets:
+            - Name: SECRET_KEY
+              ValueFrom: !Ref AppSecretKey
+            - Name: DATABASE_URL
+              ValueFrom: !Ref DatabaseUrl
+            - Name: CELERY_BROKER_URL
+              ValueFrom: !Ref RedisUrl
+            - Name: CELERY_RESULT_BACKEND
+              ValueFrom: !Ref RedisUrl
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref CeleryLogGroup
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: ecs
+
+  CeleryBeatTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub '${ProjectName}-${EnvironmentName}-celery-beat'
+      RequiresCompatibilities: [FARGATE]
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: celery-beat
+          Image: !Ref AppImageUri
+          Command: ["bash","-c","celery -A lunchlog beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler"]
+          Secrets:
+            - Name: SECRET_KEY
+              ValueFrom: !Ref AppSecretKey
+            - Name: DATABASE_URL
+              ValueFrom: !Ref DatabaseUrl
+            - Name: CELERY_BROKER_URL
+              ValueFrom: !Ref RedisUrl
+            - Name: CELERY_RESULT_BACKEND
+              ValueFrom: !Ref RedisUrl
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref CeleryBeatLogGroup
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: ecs
+
+  # ECS Services
+  BackendService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - PublicRoute
+    Properties:
+      ServiceName: !Sub '${ProjectName}-${EnvironmentName}-backend'
+      Cluster: !Ref ECSCluster
+      LaunchType: FARGATE
+      DesiredCount: !Ref DesiredCountBackend
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref PublicSubnet1
+            - !Ref PublicSubnet2
+          SecurityGroups:
+            - !Ref AppServiceSG
+      TaskDefinition: !Ref BackendTaskDefinition
+
+  CeleryService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - PublicRoute
+    Properties:
+      ServiceName: !Sub '${ProjectName}-${EnvironmentName}-celery'
+      Cluster: !Ref ECSCluster
+      LaunchType: FARGATE
+      DesiredCount: !Ref DesiredCountCelery
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref PublicSubnet1
+            - !Ref PublicSubnet2
+          SecurityGroups:
+            - !Ref AppServiceSG
+      TaskDefinition: !Ref CeleryTaskDefinition
+
+  CeleryBeatService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - PublicRoute
+    Properties:
+      ServiceName: !Sub '${ProjectName}-${EnvironmentName}-celery-beat'
+      Cluster: !Ref ECSCluster
+      LaunchType: FARGATE
+      DesiredCount: !Ref DesiredCountCeleryBeat
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref PublicSubnet1
+            - !Ref PublicSubnet2
+          SecurityGroups:
+            - !Ref AppServiceSG
+      TaskDefinition: !Ref CeleryBeatTaskDefinition
+
+Outputs:
+  ClusterName:
+    Value: !Ref ECSCluster
+  BackendServiceName:
+    Value: !GetAtt BackendService.Name
+  StaticBucketName:
+    Value: !Ref StaticBucket
+  MediaBucketName:
+    Value: !Ref MediaBucket
+  RDSEndpoint:
+    Value: !GetAtt DBInstance.Endpoint.Address
+  RedisPrimaryEndpoint:
+    Value: !GetAtt RedisReplicationGroup.PrimaryEndPoint.Address
+  BackendIngressPort:
+    Value: !Ref ContainerPort
+
