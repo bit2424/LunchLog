@@ -31,7 +31,7 @@ Parameters:
     Description: Number of celery-beat tasks
   DjangoSettingsModule:
     Type: String
-    Default: lunchlog.settings.production
+    Default: lunchlog.settings
     Description: Django settings module
   AllowedHosts:
     Type: String
@@ -366,10 +366,17 @@ Resources:
               - Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
-                Resource:
+                Resource: 
                   - !Ref AppSecretKey
                   - !Ref DatabaseUrl
                   - !Ref RedisUrl
+              - Effect: Allow
+                Action:
+                  - ssmmessages:CreateControlChannel
+                  - ssmmessages:CreateDataChannel
+                  - ssmmessages:OpenControlChannel
+                  - ssmmessages:OpenDataChannel
+                Resource: '*'
 
   # Secrets
   AppSecretKey:
@@ -589,6 +596,7 @@ Resources:
       Cluster: !Ref ECSCluster
       LaunchType: FARGATE
       DesiredCount: !Ref DesiredCountBackend
+      EnableExecuteCommand: true
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
