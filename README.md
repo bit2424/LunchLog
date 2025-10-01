@@ -38,7 +38,9 @@ Office Lunch Receipt Management and Recommendation System - REST API Backend
 
 ## Overview
 
-LunchLog is a Django REST API to manage lunch receipts and recommend restaurants. Users can upload receipt images, link them to restaurants, and browse a curated database. Background jobs enrich restaurant data (e.g., via Google Places). Media files are stored locally in development and can be stored on AWS S3 in production.
+LunchLog is a Django REST API to manage lunch receipts and recommend restaurants. Users can upload receipt images, link them to restaurants, and browse recomendations. 
+
+Background jobs enrich restaurant data (e.g., via Google Places). Media files are stored locally in development and can be stored on AWS S3 in production.
 
 ## Project Structure
 
@@ -440,7 +442,7 @@ make reset-db          # Reset database (WARNING: destroys data)
 
 ## Deployment
 
-The documentation for deployment is available [here](README_DEPLOY_AWS.md).
+The documentation for deployment is available [here](deploy/cloudformation/README_DEPLOY_AWS.md).
 
 ## Testing
 
@@ -608,3 +610,4 @@ make down                   # Stop all containers (dev/prod)
 
 - **OCR for receipts**: Extract vendor, date, total, and line items from uploaded images. This can run asynchronously via Celery to keep requests fast.
 - **Cuisine classification**: Train a lightweight classifier to better infer cuisine descriptors from names/menus; Google Maps types are often sparse or missing.
+- **Restaurant recommendations**: Think on other ways to recommend restaurants, like looking at the most popular restaurants between the users and use those as anchors for recommendations.
