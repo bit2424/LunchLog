@@ -89,6 +89,7 @@ docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPO_NAME:latest
 ```bash
 export STACK_NAME=lunchlog-prod
 export IMAGE_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPO_NAME:latest
+export GOOGLE_PLACES_API_KEY=your-google-places-api-key
 
 aws cloudformation deploy \
   --stack-name $STACK_NAME \
@@ -100,7 +101,8 @@ aws cloudformation deploy \
     EnvironmentName=prod \
     AppImageUri=$IMAGE_URI \
     AllowedHosts="*" \
-    DjangoSettingsModule=lunchlog.settings.production
+    DjangoSettingsModule=lunchlog.settings \
+    GooglePlacesApiKey=$GOOGLE_PLACES_API_KEY
 ```
 
 Wait until status is CREATE_COMPLETE:
@@ -109,11 +111,22 @@ Wait until status is CREATE_COMPLETE:
 aws cloudformation describe-stacks --stack-name $STACK_NAME --region $AWS_REGION --query 'Stacks[0].StackStatus' --output text | cat
 ```
 
+#### Update services
+```bash
+export CLUSTER=lunchlog-prod-cluster
+export SERVICE=lunchlog-prod-backend
+aws ecs update-service \
+  --cluster $CLUSTER \
+  --service $SERVICE \
+  --region $AWS_REGION \
+  --force-new-deployment
+```
+
 ### Get backend service public IP
 No ALB is used; tasks have public IPs. Retrieve them:
 
 ```bash
-export CLUSTER=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --region $AWS_REGION --query "Stacks[0].Outputs[?OutputKey=='ClusterName'].OutputValue" --output text)
+export CLUSTER= lunchlog-prod-cluster
 export SERVICE=lunchlog-prod-backend
 aws ecs list-tasks --cluster $CLUSTER --service-name $SERVICE --region $AWS_REGION --query 'taskArns' --output text | xargs -n1 -I{} aws ecs describe-tasks --cluster $CLUSTER --tasks {} --region $AWS_REGION --query 'tasks[*].attachments[0].details[?name==`publicIPv4Address`].value' --output text | cat
 ```
@@ -121,20 +134,18 @@ aws ecs list-tasks --cluster $CLUSTER --service-name $SERVICE --region $AWS_REGI
 Your API will be available at `http://PUBLIC_IP:8000` (or your configured container port).
 
 ### Running migrations and collectstatic
-Run a one-off task against the backend task definition:
 
+Execute command:
 ```bash
+export CLUSTER=lunchlog-prod-cluster
+export SERVICE=lunchlog-prod-backend
 export TASK_DEF=$(aws ecs describe-task-definition --task-definition lunchlog-prod-backend --region $AWS_REGION --query 'taskDefinition.taskDefinitionArn' --output text)
-export SUBNET_IDS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --region $AWS_REGION --query "Stacks[0].Outputs[?OutputKey=='ClusterName'].OutputValue" --output text >/dev/null; aws ec2 describe-subnets --filters Name=tag:Name,Values='lunchlog-prod-public-*' --region $AWS_REGION --query 'Subnets[].SubnetId' --output text)
-export SG_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values='lunchlog-prod-app-sg' --region $AWS_REGION --query 'SecurityGroups[0].GroupId' --output text)
 
-aws ecs run-task \
+aws ecs execute-command \
   --cluster $CLUSTER \
-  --launch-type FARGATE \
-  --task-definition $TASK_DEF \
-  --count 1 \
-  --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_IDS],securityGroups=[$SG_ID],assignPublicIp=ENABLED}" \
-  --overrides '{"containerOverrides":[{"name":"backend","command":["bash","-c","python manage.py migrate && python manage.py collectstatic --noinput"]}]}' | cat
+  --task $TASK_DEF \
+  --container backend \
+  --command "python manage.py migrate && python manage.py collectstatic --noinput"
 ```
 
 ### Notes
