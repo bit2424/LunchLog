@@ -37,6 +37,10 @@ Parameters:
     Type: String
     Default: '*'
     Description: Comma-separated allowed hosts for Django
+  GooglePlacesApiKey:
+    Type: String
+    NoEcho: true
+    Description: Google Places API key for external requests
   DBName:
     Type: String
     Default: lunchlog
@@ -335,6 +339,7 @@ Resources:
                   - !Ref AppSecretKey
                   - !Ref DatabaseUrl
                   - !Ref RedisUrl
+                  - !Ref GooglePlacesApiKeySecret
 
   TaskRole:
     Type: AWS::IAM::Role
@@ -370,6 +375,7 @@ Resources:
                   - !Ref AppSecretKey
                   - !Ref DatabaseUrl
                   - !Ref RedisUrl
+                  - !Ref GooglePlacesApiKeySecret
               - Effect: Allow
                 Action:
                   - ssmmessages:CreateControlChannel
@@ -379,6 +385,11 @@ Resources:
                 Resource: '*'
 
   # Secrets
+  GooglePlacesApiKeySecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: Google Places API key
+      SecretString: !Ref GooglePlacesApiKey
   AppSecretKey:
     Type: AWS::SecretsManager::Secret
     Properties:
@@ -519,6 +530,8 @@ Resources:
               ValueFrom: !Ref RedisUrl
             - Name: CELERY_RESULT_BACKEND
               ValueFrom: !Ref RedisUrl
+            - Name: GOOGLE_PLACES_API_KEY
+              ValueFrom: !Ref GooglePlacesApiKeySecret
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -549,6 +562,8 @@ Resources:
               ValueFrom: !Ref RedisUrl
             - Name: CELERY_RESULT_BACKEND
               ValueFrom: !Ref RedisUrl
+            - Name: GOOGLE_PLACES_API_KEY
+              ValueFrom: !Ref GooglePlacesApiKeySecret
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -579,6 +594,8 @@ Resources:
               ValueFrom: !Ref RedisUrl
             - Name: CELERY_RESULT_BACKEND
               ValueFrom: !Ref RedisUrl
+            - Name: GOOGLE_PLACES_API_KEY
+              ValueFrom: !Ref GooglePlacesApiKeySecret
           LogConfiguration:
             LogDriver: awslogs
             Options:
