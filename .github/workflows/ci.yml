@@ -34,7 +34,7 @@ jobs:
 
       - name: Run tests with coverage (fail under 80%)
         run: |
-          docker compose exec -T -e DJANGO_SETTINGS_MODULE=lunchlog.settings.test backend pytest \
+          docker compose exec -T -e DJANGO_SETTINGS_MODULE=lunchlog.settings backend pytest \
             --cov=. \
             --cov-report=html \
             --cov-report=term-missing \
