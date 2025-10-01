@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-ENV DJANGO_SETTINGS_MODULE=lunchlog.settings.production
+ENV DJANGO_SETTINGS_MODULE=lunchlog.settings
 ENV PYTHONUNBUFFERED=1
 
 # Set work directory

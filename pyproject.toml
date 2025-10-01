@@ -61,6 +61,6 @@ known_django = "django"
 sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "lunchlog.settings.test"
+DJANGO_SETTINGS_MODULE = "lunchlog.settings"
 python_files = ["tests.py", "test_*.py", "*_tests.py"]
 addopts = "--cov=. --cov-report=html --cov-report=term-missing"

@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-ENV DJANGO_SETTINGS_MODULE=lunchlog.settings.development
+ENV DJANGO_SETTINGS_MODULE=lunchlog.settings
 ENV PYTHONUNBUFFERED=1
 
 # Install make
